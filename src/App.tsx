@@ -15,7 +15,7 @@ import { PayrollView } from './components/payroll/PayrollView';
 import { ReportsView } from './components/reports/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { EmployeePortalView } from './components/employee-portal/EmployeePortalView';
-import { ArchitectureDocsView } from './components/docs/ArchitectureDocsView';
+import { MessagesView } from './components/messages/MessagesView';
 
 // Service & Types
 import { StorageService } from './services/storage';
@@ -28,7 +28,8 @@ import {
   SalaryRecord,
   CompanySettings,
   AuditLog,
-  User
+  User,
+  BroadcastMessage
 } from './types';
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
   const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
   const [settings, setSettings] = useState<CompanySettings>(() => StorageService.getSettings());
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [messages, setMessages] = useState<BroadcastMessage[]>([]);
 
   // Load / refresh data from StorageService
   const loadData = () => {
@@ -57,10 +59,15 @@ export default function App() {
     setSalaries(StorageService.getSalaries());
     setSettings(StorageService.getSettings());
     setAuditLogs(StorageService.getAuditLogs());
+    setMessages(StorageService.getMessages());
   };
 
   useEffect(() => {
     loadData();
+
+    const handleOpenDrawer = () => setIsMobileMenuOpen(true);
+    window.addEventListener('open-mobile-drawer', handleOpenDrawer);
+    return () => window.removeEventListener('open-mobile-drawer', handleOpenDrawer);
   }, []);
 
   // Handle switching user role
@@ -75,10 +82,11 @@ export default function App() {
   };
 
   const handleResetData = () => {
-    if (confirm('آیا از بازنشانی داده‌های نمونه اولیه اطمینان دارید؟ کلیه تغییرات به حالت پیش‌فرض بازخواهد گشت.')) {
+    if (confirm('آیا از بازنشانی داده‌های اولیه اطمینان دارید؟ داده‌های پیش‌فرض کارگاه بازنشانی خواهند شد.')) {
       StorageService.resetToDefaults();
       loadData();
-      alert('داده‌های نمونه اولیه با موفقیت بازنشانی شدند.');
+      setCurrentUser(StorageService.getCurrentUser());
+      alert('داده‌های پیش‌فرض کارگاه با موفقیت بارگذاری شدند.');
     }
   };
 
@@ -87,12 +95,14 @@ export default function App() {
   const pendingAdvances = advances.filter((a) => a.status === 'PENDING').length;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white" dir="rtl">
+    <div
+      className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white overflow-x-hidden w-full max-w-full"
+      dir="rtl"
+    >
       {/* Header */}
       <Header
         currentUser={currentUser}
         onUserChange={handleUserChange}
-        onOpenDocs={() => setActiveTab('docs')}
         onResetData={handleResetData}
         onNavigateToRequests={() => setActiveTab('leaves')}
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -100,7 +110,7 @@ export default function App() {
       />
 
       {/* Main Layout Container */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 gap-6">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 gap-6 pb-24 md:pb-8">
         {/* Desktop Sidebar Navigation */}
         <Sidebar
           currentRole={currentUser.role}
@@ -110,11 +120,12 @@ export default function App() {
           pendingAdvancesCount={pendingAdvances}
         />
 
-        {/* Mobile Navigation Drawer */}
+        {/* Mobile Navigation Drawer & Bottom Bar */}
         <MobileNav
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
           currentRole={currentUser.role}
+          currentUser={currentUser}
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           pendingLeavesCount={pendingLeaves}
@@ -146,7 +157,7 @@ export default function App() {
               employees={employees}
               shifts={shifts}
               onRefresh={loadData}
-              canEdit={currentUser.role === 'ADMIN'}
+              canEdit={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
             />
           )}
 
@@ -164,7 +175,7 @@ export default function App() {
             <SchedulesView
               shifts={shifts}
               onRefresh={loadData}
-              canEdit={currentUser.role === 'ADMIN'}
+              canEdit={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
             />
           )}
 
@@ -173,6 +184,16 @@ export default function App() {
               employees={employees}
               attendance={attendance}
               onRefresh={loadData}
+            />
+          )}
+
+          {activeTab === 'messages' && (
+            <MessagesView
+              currentUser={currentUser}
+              employees={employees}
+              messages={messages}
+              onRefresh={loadData}
+              canSend={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
             />
           )}
 
@@ -202,7 +223,7 @@ export default function App() {
               employees={employees}
               currentUser={currentUser}
               onRefresh={loadData}
-              canManage={currentUser.role === 'ADMIN'}
+              canManage={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
             />
           )}
 
@@ -219,7 +240,7 @@ export default function App() {
               settings={settings}
               auditLogs={auditLogs}
               onRefresh={loadData}
-              canEdit={currentUser.role === 'ADMIN'}
+              canEdit={currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER'}
             />
           )}
 
@@ -235,12 +256,24 @@ export default function App() {
               onNavigate={setActiveTab}
             />
           )}
-
-          {activeTab === 'docs' && (
-            <ArchitectureDocsView />
-          )}
         </main>
       </div>
+
+      {/* Footer */}
+      <footer className="w-full text-center py-4 text-xs text-slate-500 border-t border-slate-200/80 bg-white/70 backdrop-blur-xs mt-auto">
+        <div className="flex items-center justify-center gap-2 flex-wrap px-4">
+          <span>سامانه مدیریت کارگاهی M.GOMMON • مجید نورایی</span>
+          <span>•</span>
+          <a
+            href="https://ahourai.ir"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-600 font-medium transition-colors cursor-pointer"
+          >
+            طراحی و توسعه توسط اهورایی ❤️
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }

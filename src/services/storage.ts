@@ -9,7 +9,8 @@ import {
   AuditLog,
   User,
   BonusOrPenalty,
-  RequestStatus
+  RequestStatus,
+  BroadcastMessage
 } from '../types';
 import {
   initialCompanySettings,
@@ -21,22 +22,24 @@ import {
   initialSalaryRecords,
   initialAuditLogs,
   initialUsers,
-  initialBonusesPenalties
+  initialBonusesPenalties,
+  initialBroadcastMessages
 } from '../data/initialData';
 import { getCurrentTimeStr, getTodayShamsi, calculateGpsDistanceMeters } from '../utils/dateUtils';
 
 const STORAGE_KEYS = {
-  SETTINGS: 'hrm_company_settings_v1',
-  SHIFTS: 'hrm_shifts_v1',
-  EMPLOYEES: 'hrm_employees_v1',
-  ATTENDANCE: 'hrm_attendance_v1',
-  LEAVES: 'hrm_leaves_v1',
-  ADVANCES: 'hrm_advances_v1',
-  SALARIES: 'hrm_salaries_v1',
-  AUDIT_LOGS: 'hrm_audit_logs_v1',
-  USERS: 'hrm_users_v1',
-  BONUSES: 'hrm_bonuses_v1',
-  CURRENT_USER: 'hrm_current_user_v1',
+  SETTINGS: 'mgommon_company_settings_v2',
+  SHIFTS: 'mgommon_shifts_v2',
+  EMPLOYEES: 'mgommon_employees_v2',
+  ATTENDANCE: 'mgommon_attendance_v2',
+  LEAVES: 'mgommon_leaves_v2',
+  ADVANCES: 'mgommon_advances_v2',
+  SALARIES: 'mgommon_salaries_v2',
+  AUDIT_LOGS: 'mgommon_audit_logs_v2',
+  USERS: 'mgommon_users_v2',
+  BONUSES: 'mgommon_bonuses_v2',
+  MESSAGES: 'mgommon_messages_v2',
+  CURRENT_USER: 'mgommon_current_user_v2',
 };
 
 function getItem<T>(key: string, fallback: T): T {
@@ -58,19 +61,13 @@ function setItem<T>(key: string, value: T): void {
 }
 
 export class StorageService {
-  // Reset all data to factory demo defaults
-  static resetToDefaults() {
-    localStorage.removeItem(STORAGE_KEYS.SETTINGS);
-    localStorage.removeItem(STORAGE_KEYS.SHIFTS);
-    localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
-    localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
-    localStorage.removeItem(STORAGE_KEYS.LEAVES);
-    localStorage.removeItem(STORAGE_KEYS.ADVANCES);
-    localStorage.removeItem(STORAGE_KEYS.SALARIES);
-    localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
-    localStorage.removeItem(STORAGE_KEYS.USERS);
-    localStorage.removeItem(STORAGE_KEYS.BONUSES);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  // Aliases for leaves and advances
+  static saveLeaves(leaves: LeaveRequest[]): void {
+    this.saveLeaveRequests(leaves);
+  }
+
+  static saveAdvances(advances: AdvanceRequest[]): void {
+    this.saveAdvanceRequests(advances);
   }
 
   // Current logged in / simulated user
@@ -148,12 +145,52 @@ export class StorageService {
     const list = this.getEmployees();
     list.unshift(emp);
     this.saveEmployees(list);
-    this.addAuditLog('استخدام کارمند جدید', 'کارکنان', `پرسنل ${emp.firstName} ${emp.lastName} با کد ${emp.personalCode} ثبت شد.`);
+
+    // Automatically create employee user credentials & portal access
+    const users = this.getUsers();
+    const username = emp.username || (emp.nationalCode ? `emp_${emp.nationalCode.slice(-4)}` : `user_${emp.personalCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
+    const newUser: User = {
+      id: `usr_${emp.id}`,
+      companyId: emp.companyId || 'comp_mgommon_01',
+      employeeId: emp.id,
+      username: username,
+      password: emp.password || '123456',
+      name: `${emp.firstName} ${emp.lastName}`,
+      email: emp.email || `${username}@mgommon.ir`,
+      phone: emp.phone,
+      role: 'EMPLOYEE',
+      workshopId: emp.workshopId || 'ws_1',
+      avatarUrl: emp.avatarUrl
+    };
+
+    if (!users.some(u => u.username === username || u.employeeId === emp.id)) {
+      users.push(newUser);
+      this.saveUsers(users);
+    }
+
+    this.addAuditLog('استخدام و ایجاد پرتال پرسنل', 'کارکنان', `پرسنل ${emp.firstName} ${emp.lastName} با دسترسی پرتال کاربری ایجاد شد.`);
   }
 
   static updateEmployee(emp: Employee): void {
     const list = this.getEmployees().map(e => e.id === emp.id ? emp : e);
     this.saveEmployees(list);
+
+    // Also update associated user if present
+    const users = this.getUsers().map(u => {
+      if (u.employeeId === emp.id) {
+        return {
+          ...u,
+          name: `${emp.firstName} ${emp.lastName}`,
+          phone: emp.phone,
+          email: emp.email || u.email,
+          workshopId: emp.workshopId || u.workshopId,
+          avatarUrl: emp.avatarUrl || u.avatarUrl,
+        };
+      }
+      return u;
+    });
+    this.saveUsers(users);
+
     this.addAuditLog('ویرایش اطلاعات پرسنل', 'کارکنان', `اطلاعات ${emp.firstName} ${emp.lastName} اصلاح شد.`);
   }
 
@@ -161,6 +198,11 @@ export class StorageService {
     const target = this.getEmployees().find(e => e.id === id);
     const list = this.getEmployees().filter(e => e.id !== id);
     this.saveEmployees(list);
+
+    // Remove user account
+    const users = this.getUsers().filter(u => u.employeeId !== id);
+    this.saveUsers(users);
+
     if (target) {
       this.addAuditLog('حذف پرونده کارمند', 'کارکنان', `کارمند ${target.firstName} ${target.lastName} از سیستم حذف شد.`);
     }
@@ -191,22 +233,40 @@ export class StorageService {
     const shifts = this.getShifts();
     const shift = shifts.find(s => s.id === emp.shiftId) || shifts[0];
 
-    // Check GPS validation if coords provided
+    // Check GPS validation if coords provided against workshops (strictly 20m radius)
     let verifiedLocation;
     if (gpsCoords) {
-      const distance = calculateGpsDistanceMeters(
-        gpsCoords.lat,
-        gpsCoords.lng,
-        settings.officeLat,
-        settings.officeLng
-      );
-      if (distance > settings.allowedGpsRadiusMeters) {
+      const workshops = settings.workshops || [];
+      let minDistance = 999999;
+      let matchedWorkshopName = 'کارگاه';
+
+      if (workshops.length > 0) {
+        workshops.forEach(ws => {
+          const dist = calculateGpsDistanceMeters(gpsCoords.lat, gpsCoords.lng, ws.lat, ws.lng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            matchedWorkshopName = ws.name;
+          }
+        });
+      } else {
+        minDistance = calculateGpsDistanceMeters(
+          gpsCoords.lat,
+          gpsCoords.lng,
+          settings.officeLat,
+          settings.officeLng
+        );
+      }
+
+      const maxAllowed = settings.allowedGpsRadiusMeters || 20;
+      const roundedDistance = Math.round(minDistance);
+
+      if (roundedDistance > maxAllowed) {
         return {
           success: false,
-          message: `موقعیت مکانی شما (${distance} متر) خارج از محدوده مجاز شرکت (${settings.allowedGpsRadiusMeters} متر) است.`
+          message: `فاصله فعلی شما (${roundedDistance} متر) خارج از محدوده مجاز ${matchedWorkshopName} (حداکثر ${maxAllowed} متر) است.`
         };
       }
-      verifiedLocation = { lat: gpsCoords.lat, lng: gpsCoords.lng, distanceMeters: distance };
+      verifiedLocation = { lat: gpsCoords.lat, lng: gpsCoords.lng, distanceMeters: roundedDistance };
     }
 
     const records = this.getAttendance();
@@ -297,6 +357,40 @@ export class StorageService {
 
     if (existing.checkOutTime) {
       return { success: false, message: `خروج شما قبلاً در ساعت ${existing.checkOutTime} ثبت شده است.` };
+    }
+
+    // Check GPS validation if coords provided against workshops (strictly 20m radius)
+    if (gpsCoords) {
+      const workshops = settings.workshops || [];
+      let minDistance = 999999;
+      let matchedWorkshopName = 'کارگاه';
+
+      if (workshops.length > 0) {
+        workshops.forEach(ws => {
+          const dist = calculateGpsDistanceMeters(gpsCoords.lat, gpsCoords.lng, ws.lat, ws.lng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            matchedWorkshopName = ws.name;
+          }
+        });
+      } else {
+        minDistance = calculateGpsDistanceMeters(
+          gpsCoords.lat,
+          gpsCoords.lng,
+          settings.officeLat,
+          settings.officeLng
+        );
+      }
+
+      const maxAllowed = settings.allowedGpsRadiusMeters || 20;
+      const roundedDistance = Math.round(minDistance);
+
+      if (roundedDistance > maxAllowed) {
+        return {
+          success: false,
+          message: `فاصله فعلی شما (${roundedDistance} متر) خارج از محدوده مجاز ${matchedWorkshopName} (حداکثر ${maxAllowed} متر) است.`
+        };
+      }
     }
 
     const shifts = this.getShifts();
@@ -663,5 +757,48 @@ export class StorageService {
     list.unshift(newLog);
     // keep latest 100 logs
     setItem(STORAGE_KEYS.AUDIT_LOGS, list.slice(0, 100));
+  }
+
+  // Broadcast Messages & SMS Panel
+  static getMessages(): BroadcastMessage[] {
+    return getItem<BroadcastMessage[]>(STORAGE_KEYS.MESSAGES, initialBroadcastMessages);
+  }
+
+  static saveMessages(messages: BroadcastMessage[]): void {
+    setItem(STORAGE_KEYS.MESSAGES, messages);
+  }
+
+  static addMessage(msg: BroadcastMessage): void {
+    const list = this.getMessages();
+    list.unshift(msg);
+    this.saveMessages(list);
+    this.addAuditLog('ارسال پیام / پیامک', 'پیام‌رسانی و پیامک', `ارسال اطلاعیه «${msg.title}» به ${msg.recipientType === 'ALL' ? 'همه کارکنان' : msg.recipientType} از طریق کانال ${msg.channel}`);
+  }
+
+  static deleteMessage(id: string): void {
+    const list = this.getMessages().filter(m => m.id !== id);
+    this.saveMessages(list);
+    this.addAuditLog('حذف پیام', 'پیام‌رسانی و پیامک', `شناسه پیام: ${id}`);
+  }
+
+  // Reset demo data to defaults
+  static resetToDefaults(): void {
+    Object.values(STORAGE_KEYS).forEach(k => {
+      try {
+        localStorage.removeItem(k);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+    this.saveSettings(initialCompanySettings);
+    this.saveShifts(initialShifts);
+    this.saveEmployees(initialEmployees);
+    this.saveAttendance(initialAttendanceRecords);
+    this.saveLeaves(initialLeaveRequests);
+    this.saveAdvances(initialAdvanceRequests);
+    this.saveSalaries(initialSalaryRecords);
+    this.saveUsers(initialUsers);
+    this.saveMessages(initialBroadcastMessages);
+    this.setCurrentUser(initialUsers[0]);
   }
 }

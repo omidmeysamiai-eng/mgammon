@@ -5,11 +5,38 @@ export interface User {
   companyId: string;
   employeeId?: string;
   username: string;
+  password?: string;
   name: string;
   email: string;
   phone: string;
   role: Role;
+  workshopId?: string;
   avatarUrl?: string;
+}
+
+export interface Workshop {
+  id: string;
+  name: string;
+  code: string;
+  lat: number;
+  lng: number;
+  allowedRadiusMeters: number; // default 20 meters
+  address?: string;
+}
+
+export interface BroadcastMessage {
+  id: string;
+  companyId: string;
+  senderName: string;
+  recipientType: 'ALL' | 'WORKSHOP_1' | 'WORKSHOP_2' | 'SELECTED';
+  recipientIds?: string[];
+  recipientNames?: string[];
+  title: string;
+  content: string;
+  channel: 'SMS' | 'IN_APP' | 'BOTH';
+  sentAt: string;
+  status: 'DELIVERED' | 'SENT';
+  partsCount?: number;
 }
 
 export type EmployeeStatus = 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE';
@@ -25,6 +52,9 @@ export interface Employee {
   email: string;
   department: string;
   position: string;
+  workshopId?: string; // e.g. 'ws_1' or 'ws_2'
+  username?: string;
+  password?: string;
   hireDate: string; // Shamsi string e.g. 1402/05/15
   status: EmployeeStatus;
   shiftId: string;
@@ -166,12 +196,16 @@ export interface CompanySettings {
   id: string;
   companyName: string;
   companyCode: string;
+  ownerName?: string;
   logoUrl?: string;
   address: string;
   phoneNumber: string;
   officeLat: number;
   officeLng: number;
-  allowedGpsRadiusMeters: number;
+  allowedGpsRadiusMeters: number; // default 20 meters
+  workshops: Workshop[];
+  smsApiKey?: string;
+  smsSenderNumber?: string;
   qrRefreshIntervalSeconds: number;
   workDaysPerMonth: number;
   insuranceRatePercent: number; // 7%

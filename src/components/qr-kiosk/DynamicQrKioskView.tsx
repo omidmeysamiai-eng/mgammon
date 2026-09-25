@@ -8,12 +8,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   Smartphone,
-  ScanLine,
   Navigation,
-  Lock,
-  ArrowRightLeft
+  Building,
+  Fingerprint,
+  Radio,
+  Check,
+  X
 } from 'lucide-react';
-import { Employee, AttendanceRecord } from '../../types';
+import { Employee, AttendanceRecord, Workshop } from '../../types';
 import { StorageService } from '../../services/storage';
 import {
   getCurrentTimeStr,
@@ -34,34 +36,56 @@ export const DynamicQrKioskView: React.FC<DynamicQrKioskViewProps> = ({
   onRefresh,
 }) => {
   const settings = StorageService.getSettings();
+  const workshops = settings.workshops || [
+    {
+      id: 'ws_1',
+      name: 'کارگاه ۱ (اصلی - سالن تولید)',
+      code: 'کارگاه ۱',
+      lat: 35.75750,
+      lng: 51.41000,
+      allowedRadiusMeters: 20,
+    },
+    {
+      id: 'ws_2',
+      name: 'کارگاه ۲ (فرعی - انبار و مونتاژ)',
+      code: 'کارگاه ۲',
+      lat: 35.75764,
+      lng: 51.41015,
+      allowedRadiusMeters: 20,
+    }
+  ];
+
   const shamsi = getTodayShamsiDetailed();
+  const [selectedWorkshop, setSelectedWorkshop] = useState<Workshop>(workshops[0]);
 
   // Dynamic QR Code state: changes every 30 seconds
   const [timeLeft, setTimeLeft] = useState(settings.qrRefreshIntervalSeconds || 30);
   const [qrToken, setQrToken] = useState('');
   const [qrNonce, setQrNonce] = useState(1);
 
-  // Mobile Scanner Simulator State
+  // Punch Action State
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(employees[0]?.id || '');
   const [actionType, setActionType] = useState<'IN' | 'OUT'>('IN');
-  const [simulatedLat, setSimulatedLat] = useState(settings.officeLat);
-  const [simulatedLng, setSimulatedLng] = useState(settings.officeLng);
+  const [currentLat, setCurrentLat] = useState(workshops[0].lat);
+  const [currentLng, setCurrentLng] = useState(workshops[0].lng);
+  const [isGettingRealGps, setIsGettingRealGps] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<{
     success: boolean;
     message: string;
     distance?: number;
   } | null>(null);
 
-  // Generate cryptographic-like dynamic token
+  // Generate dynamic QR token
   const generateDynamicToken = () => {
     const timestamp = Math.floor(Date.now() / 1000);
-    const hash = Math.random().toString(36).substring(2, 10).toUpperCase();
-    return `HRM_TOTP_${settings.companyCode}_${timestamp}_${hash}`;
+    const hash = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `MGOMMON_${selectedWorkshop.code}_${timestamp}_${hash}`;
   };
 
   useEffect(() => {
     setQrToken(generateDynamicToken());
-  }, [qrNonce]);
+  }, [qrNonce, selectedWorkshop]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -76,220 +100,232 @@ export const DynamicQrKioskView: React.FC<DynamicQrKioskViewProps> = ({
     return () => clearInterval(timer);
   }, [settings.qrRefreshIntervalSeconds]);
 
-  // Distance of simulated location to office
-  const currentDistance = calculateGpsDistanceMeters(
-    simulatedLat,
-    simulatedLng,
-    settings.officeLat,
-    settings.officeLng
-  );
-  const isInsideFence = currentDistance <= settings.allowedGpsRadiusMeters;
+  // Switch workshop
+  const handleSelectWorkshop = (ws: Workshop) => {
+    setSelectedWorkshop(ws);
+    setCurrentLat(ws.lat);
+    setCurrentLng(ws.lng);
+    setScanResult(null);
+  };
 
-  const handleSimulateScan = () => {
+  // Get real phone GPS
+  const handleGetRealGps = () => {
+    if (!navigator.geolocation) {
+      setGpsError('مرورگر شما از موقعیت مکانی (GPS) پشتیبانی نمی‌کند.');
+      return;
+    }
+
+    setIsGettingRealGps(true);
+    setGpsError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCurrentLat(pos.coords.latitude);
+        setCurrentLng(pos.coords.longitude);
+        setIsGettingRealGps(false);
+      },
+      (err) => {
+        setIsGettingRealGps(false);
+        setGpsError('دسترسی به GPS داده نشد یا موقعیت در دسترس نیست. موقعیت پیش‌فرض کارگاه فعال شد.');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  // Calculate distance to selected workshop
+  const distanceToWorkshop = Math.round(
+    calculateGpsDistanceMeters(
+      currentLat,
+      currentLng,
+      selectedWorkshop.lat,
+      selectedWorkshop.lng
+    )
+  );
+
+  const maxAllowedRadius = selectedWorkshop.allowedRadiusMeters || 20;
+  const isWithin20Meters = distanceToWorkshop <= maxAllowedRadius;
+
+  // Execute punch
+  const handleExecutePunch = () => {
     const emp = employees.find((e) => e.id === selectedEmployeeId);
     if (!emp) return;
 
     if (actionType === 'IN') {
       const res = StorageService.clockIn(emp.id, 'QR_CODE', {
-        lat: simulatedLat,
-        lng: simulatedLng,
+        lat: currentLat,
+        lng: currentLng,
       });
       setScanResult({
         success: res.success,
         message: res.message,
-        distance: currentDistance,
+        distance: distanceToWorkshop,
       });
     } else {
       const res = StorageService.clockOut(emp.id, 'QR_CODE', {
-        lat: simulatedLat,
-        lng: simulatedLng,
+        lat: currentLat,
+        lng: currentLng,
       });
       setScanResult({
         success: res.success,
         message: res.message,
-        distance: currentDistance,
+        distance: distanceToWorkshop,
       });
     }
     onRefresh();
   };
 
-  // Helper presets for GPS simulator
-  const setPresetLocation = (type: 'EXACT' | 'NEAR' | 'FAR') => {
-    if (type === 'EXACT') {
-      setSimulatedLat(settings.officeLat);
-      setSimulatedLng(settings.officeLng);
-    } else if (type === 'NEAR') {
-      // ~60 meters away
-      setSimulatedLat(settings.officeLat + 0.0004);
-      setSimulatedLng(settings.officeLng + 0.0004);
+  // Preset location testing within the 20-meter rule
+  const setTestDistance = (distanceType: 'INSIDE' | 'ENTRANCE' | 'OUTSIDE') => {
+    if (distanceType === 'INSIDE') {
+      // ~4 meters
+      setCurrentLat(selectedWorkshop.lat);
+      setCurrentLng(selectedWorkshop.lng + 0.00004);
+    } else if (distanceType === 'ENTRANCE') {
+      // ~16 meters (inside 20m)
+      setCurrentLat(selectedWorkshop.lat + 0.00014);
+      setCurrentLng(selectedWorkshop.lng);
     } else {
-      // ~2.5 kilometers away
-      setSimulatedLat(settings.officeLat + 0.02);
-      setSimulatedLng(settings.officeLng + 0.02);
+      // ~38 meters (outside 20m)
+      setCurrentLat(selectedWorkshop.lat + 0.00035);
+      setCurrentLng(selectedWorkshop.lng + 0.00035);
     }
     setScanResult(null);
   };
 
+  const selectedEmployee = employees.find((e) => e.id === selectedEmployeeId);
+  const todayRecord = attendance.find(
+    (a) => a.employeeId === selectedEmployeeId && a.date === shamsi.dateString
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full">
       {/* Top Banner */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1 rounded bg-indigo-100 text-indigo-700">
-              <QrCode className="w-5 h-5" />
-            </span>
-            <h2 className="text-lg font-bold text-slate-800">
-              معماری کیوسک QR داینامیک و احراز هویت مکانی (GPS)
-            </h2>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold shadow-xs">
+              <QrCode className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="text-lg lg:text-xl font-bold text-slate-800">
+                کیوسک ثبت تردد کارگاه
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                ثبت ورود و خروج با کیوسک QR چرخان و سنجش فاصله جغرافیایی (حداکثر فاصله مجاز: ۲۰ متر)
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            کد QR امن و چرخان با الگوریتم زمان‌بندی‌شده (TOTP) مانع از ارسال عکس و جعل حضور پرسنل خارج از شرکت می‌شود.
-          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            ضد جعل و بازتولید برخط
-          </span>
+        {/* Workshop Switcher */}
+        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+          {workshops.map((ws) => {
+            const isSelected = selectedWorkshop.id === ws.id;
+            return (
+              <button
+                key={ws.id}
+                onClick={() => handleSelectWorkshop(ws)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {ws.name.split(' (')[0]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Main Two-Column Layout: Kiosk Display on Right, Mobile Scan Simulator on Left */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Right: Kiosk Display Screen (نمای تبلت ورودی شرکت) */}
-        <div className="lg:col-span-6 bg-slate-900 text-white rounded-3xl p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden shadow-xl border border-slate-800">
+      {/* Main Two-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full max-w-full">
+        {/* Left/Tablet Screen: Visual Kiosk Display */}
+        <div className="lg:col-span-6 bg-gradient-to-b from-slate-950 to-slate-900 text-white rounded-3xl p-6 lg:p-8 flex flex-col justify-between relative overflow-hidden shadow-xl border border-slate-800">
           <div className="absolute -top-24 -right-24 w-60 h-60 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top of Kiosk */}
+          {/* Top Bar of Kiosk */}
           <div>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
-              <div className="flex items-center gap-2.5">
-                <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-bold text-slate-200 tracking-wide">
-                  کیوسک مرکزی ثبت تردد ورودی ({settings.companyName})
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-6">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-xs font-bold text-slate-200">
+                  {selectedWorkshop.name}
                 </span>
               </div>
-              <div className="text-xs text-indigo-400 font-mono">
+              <div className="text-xs text-indigo-300 font-mono">
                 {shamsi.dayOfWeek} {shamsi.dateString}
               </div>
             </div>
 
-            <div className="text-center space-y-2">
-              <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-slate-800 text-indigo-300 border border-slate-700">
-                اپلیکیشن همراه را باز کرده و کد را اسکن کنید
+            <div className="text-center space-y-1.5 mb-6">
+              <span className="inline-block px-3 py-1 rounded-full text-[11px] font-medium bg-slate-800 text-indigo-300 border border-slate-700">
+                بارکد امنیتی تردد پرسنل
               </span>
-              <h3 className="text-2xl font-black tracking-tight text-white">
-                ثبت ورود و خروج با دوربین گوشی
+              <h3 className="text-lg font-bold text-white">
+                دوربین گوشی خود را مقابل بارکد قرار دهید
               </h3>
             </div>
-          </div>
 
-          {/* Center: Dynamic QR Visual Card */}
-          <div className="my-8 flex flex-col items-center justify-center">
-            <div className="relative p-6 bg-white rounded-3xl shadow-2xl border-4 border-indigo-500/30">
-              {/* Simulated SVG QR Code pattern */}
-              <div className="w-56 h-56 bg-slate-900 rounded-2xl flex flex-col items-center justify-center relative p-3 overflow-hidden">
-                {/* SVG Visualizing Dynamic QR Code with center logo */}
-                <svg
-                  className="w-full h-full text-white"
-                  viewBox="0 0 100 100"
-                  fill="currentColor"
-                >
-                  <rect x="10" y="10" width="24" height="24" rx="3" fill="#ffffff" />
-                  <rect x="14" y="14" width="16" height="16" rx="2" fill="#0f172a" />
-                  <rect x="18" y="18" width="8" height="8" rx="1" fill="#ffffff" />
-
-                  <rect x="66" y="10" width="24" height="24" rx="3" fill="#ffffff" />
-                  <rect x="70" y="14" width="16" height="16" rx="2" fill="#0f172a" />
-                  <rect x="74" y="18" width="8" height="8" rx="1" fill="#ffffff" />
-
-                  <rect x="10" y="66" width="24" height="24" rx="3" fill="#ffffff" />
-                  <rect x="14" y="70" width="16" height="16" rx="2" fill="#0f172a" />
-                  <rect x="18" y="74" width="8" height="8" rx="1" fill="#ffffff" />
-
-                  {/* Pseudo data dots that shift with qrNonce */}
-                  <rect x="42" y="14" width="6" height="6" fill="#ffffff" />
-                  <rect x="52" y="18" width="6" height="6" fill="#ffffff" />
-                  <rect x="42" y="28" width="6" height="6" fill="#ffffff" />
-                  <rect x="14" y="44" width="6" height="6" fill="#ffffff" />
-                  <rect x="24" y="44" width="6" height="6" fill="#ffffff" />
-                  <rect x="34" y="44" width="6" height="6" fill="#ffffff" />
-                  <rect x="44" y="44" width="12" height="12" rx="2" fill="#6366f1" />
-                  <rect x="60" y="44" width="6" height="6" fill="#ffffff" />
-                  <rect x="72" y="44" width="6" height="6" fill="#ffffff" />
-                  <rect x="80" y="52" width="6" height="6" fill="#ffffff" />
-                  <rect x="42" y="66" width="6" height="6" fill="#ffffff" />
-                  <rect x="52" y="76" width="6" height="6" fill="#ffffff" />
-                  <rect x="66" y="70" width="6" height="6" fill="#ffffff" />
-                  <rect x="78" y="78" width="8" height="8" fill="#ffffff" />
-                </svg>
-
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 border-2 border-white flex items-center justify-center text-white font-bold text-xs shadow-md">
-                    HRM
-                  </div>
+            {/* QR Code Container */}
+            <div className="relative mx-auto w-56 h-56 sm:w-64 sm:h-64 bg-white p-4 rounded-3xl shadow-2xl flex flex-col items-center justify-center border-4 border-indigo-500/30">
+              {/* Dynamic QR Grid Graphic */}
+              <div className="w-full h-full bg-slate-900 rounded-2xl flex flex-col items-center justify-center p-3 relative overflow-hidden">
+                <QrCode className="w-36 h-36 sm:w-44 sm:h-44 text-white" />
+                {/* Overlay rotating token info */}
+                <div className="absolute bottom-2 px-2 py-0.5 rounded bg-indigo-600/90 text-[10px] font-mono text-white tracking-widest">
+                  {qrToken.slice(0, 16)}...
                 </div>
               </div>
 
-              {/* Countdown badge overlay */}
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 text-indigo-400 font-mono text-xs px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>بروزرسانی در: {timeLeft} ثانیه</span>
+              {/* Live Expiration Progress Ring */}
+              <div className="absolute -bottom-3 px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-mono border border-slate-700 flex items-center gap-1.5 shadow-md">
+                <RefreshCw className="w-3 h-3 text-indigo-400 animate-spin" />
+                <span>بروزرسانی در: {formatNumberFa(timeLeft)} ثانیه</span>
               </div>
             </div>
 
-            {/* Token details */}
-            <div className="mt-6 text-center max-w-sm">
-              <span className="text-[11px] text-slate-400 block mb-1">
-                توکن اعتبارسنجی سرور (Server TOTP Signature):
-              </span>
-              <div className="font-mono text-xs text-indigo-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 truncate">
-                {qrToken}
+            {/* Kiosk Status Info */}
+            <div className="mt-8 grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/80 text-center">
+                <span className="text-slate-400 block text-[11px]">موقعیت جغرافیایی:</span>
+                <span className="font-mono text-indigo-300 font-semibold text-[11px] mt-0.5 block">
+                  {selectedWorkshop.lat.toFixed(5)}, {selectedWorkshop.lng.toFixed(5)}
+                </span>
+              </div>
+              <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/80 text-center">
+                <span className="text-slate-400 block text-[11px]">حداکثر شعاع مجاز:</span>
+                <span className="font-bold text-emerald-400 text-xs mt-0.5 block">
+                  {formatNumberFa(maxAllowedRadius)} متر (محیط بسته کارگاه)
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Bottom Kiosk info */}
-          <div className="border-t border-slate-800/80 pt-4 flex items-center justify-between text-xs text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-rose-400" />
-              <span>
-                مختصات ثبت‌شده شرکت: {settings.officeLat.toFixed(4)}, {settings.officeLng.toFixed(4)}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Lock className="w-4 h-4 text-emerald-400" />
-              <span>شعاع مجاز: {settings.allowedGpsRadiusMeters} متر</span>
-            </div>
+          {/* Footer of Kiosk */}
+          <div className="mt-6 pt-4 border-t border-slate-800/80 text-center text-[11px] text-slate-400">
+            سیستم ثبت تردد هوشمند M.GOMMON • کیوسک کارگاهی
           </div>
         </div>
 
-        {/* Left: Interactive Mobile Scanner & Geo-Fence Simulator */}
-        <div className="lg:col-span-6 bg-white rounded-3xl p-6 lg:p-7 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+        {/* Right/Second Column: Employee Punch Action & 20m Radius Verification */}
+        <div className="lg:col-span-6 bg-white p-5 lg:p-6 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-5">
           <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-800 text-base">
-                  شبیه‌ساز اسکن گوشی موبایل کارمند
-                </h3>
-              </div>
-              <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">
-                تست احراز هویت مکانی
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h3 className="font-bold text-sm lg:text-base text-slate-800 flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-indigo-600" />
+                <span>ثبت تردد کارمند در {selectedWorkshop.name.split(' (')[0]}</span>
+              </h3>
+              <span className="text-xs text-slate-400 font-medium">
+                ساعت جاری: {getCurrentTimeStr()}
               </span>
             </div>
 
-            <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-              با انتخاب کارمند و موقعیت مکانی، الگوریتم اعتبارسنجی همزمان توکن کیوسک و فاصله جغرافیایی با دفتر شرکت را ارزیابی کنید.
-            </p>
-
-            {/* Step 1: Select Employee */}
+            {/* Select Employee */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  ۱. کارمند اسکن‌کننده:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  انتخاب پرسنل جهت ثبت تردد:
                 </label>
                 <select
                   value={selectedEmployeeId}
@@ -297,7 +333,7 @@ export const DynamicQrKioskView: React.FC<DynamicQrKioskViewProps> = ({
                     setSelectedEmployeeId(e.target.value);
                     setScanResult(null);
                   }}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 bg-white"
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-white font-medium focus:outline-hidden focus:border-indigo-500"
                 >
                   {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
@@ -307,10 +343,10 @@ export const DynamicQrKioskView: React.FC<DynamicQrKioskViewProps> = ({
                 </select>
               </div>
 
-              {/* Step 2: Action Type (IN vs OUT) */}
+              {/* Action Type: Clock-In or Clock-Out */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  ۲. نوع اقدام:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  نوع عملیات:
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -319,115 +355,193 @@ export const DynamicQrKioskView: React.FC<DynamicQrKioskViewProps> = ({
                       setActionType('IN');
                       setScanResult(null);
                     }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       actionType === 'IN'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    ثبت ورود (Check In)
+                    <Check className="w-4 h-4" />
+                    <span>ثبت ورود به کارگاه</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
                       setActionType('OUT');
                       setScanResult(null);
                     }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       actionType === 'OUT'
-                        ? 'bg-rose-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    ثبت خروج (Check Out)
+                    <X className="w-4 h-4" />
+                    <span>ثبت خروج از کارگاه</span>
                   </button>
                 </div>
               </div>
 
-              {/* Step 3: Location Geofence Tester */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+              {/* Status of selected employee today */}
+              {selectedEmployee && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs space-y-1">
+                  <div className="flex items-center justify-between text-slate-700">
+                    <span className="font-semibold">{selectedEmployee.firstName} {selectedEmployee.lastName}</span>
+                    <span className="text-[11px] text-slate-400">کد پرسنلی: {selectedEmployee.personalCode}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    وضعیت امروز:{' '}
+                    {todayRecord?.checkInTime && todayRecord?.checkOutTime ? (
+                      <span className="text-emerald-700 font-bold">ورود ({todayRecord.checkInTime}) - خروج ({todayRecord.checkOutTime})</span>
+                    ) : todayRecord?.checkInTime ? (
+                      <span className="text-indigo-700 font-bold">ورود ثبت شده ({todayRecord.checkInTime}) - در حال کار</span>
+                    ) : (
+                      <span className="text-amber-700 font-bold">هنوز ورودی ثبت نشده است</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Distance & GPS 20-Meter Verification Card */}
+              <div className="p-4 rounded-2xl border bg-slate-50/80 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Navigation className="w-4 h-4 text-indigo-600" />
-                    ۳. شبیه‌سازی موقعیت GPS گوشی:
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <MapPin className={`w-4 h-4 ${isWithin20Meters ? 'text-emerald-600' : 'text-rose-600'}`} />
+                    <span className="text-xs font-bold text-slate-800">
+                      بررسی موقعیت تا {selectedWorkshop.name.split(' (')[0]}
+                    </span>
+                  </div>
                   <span
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      isInsideFence
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-rose-100 text-rose-800'
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                      isWithin20Meters
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
                     }`}
                   >
-                    فاصله تا شرکت: {formatNumberFa(currentDistance)} متر (
-                    {isInsideFence ? 'مجاز' : 'غیرمجاز'})
+                    {isWithin20Meters ? `مجاز (${distanceToWorkshop} متر)` : `غیرمجاز (${distanceToWorkshop} متر)`}
                   </span>
                 </div>
 
-                {/* Preset quick test buttons */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setPresetLocation('EXACT')}
-                    className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 text-[11px] font-medium"
-                  >
-                    حضور در لابی (۰ متر)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresetLocation('NEAR')}
-                    className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-indigo-400 text-slate-700 text-[11px] font-medium"
-                  >
-                    حیاط شرکت (۶۰ متر)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPresetLocation('FAR')}
-                    className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-rose-400 text-rose-600 text-[11px] font-medium"
-                  >
-                    خارج شرکت (۲ کیلومتر)
-                  </button>
+                <div className="text-xs text-slate-600 flex items-center justify-between">
+                  <span>فاصله محاسبه‌شده تا مرکز کارگاه:</span>
+                  <strong className="font-bold text-slate-800 font-mono">
+                    {formatNumberFa(distanceToWorkshop)} متر
+                  </strong>
+                </div>
+
+                {/* Progress bar visual for 20 meters */}
+                <div className="space-y-1">
+                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        isWithin20Meters ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (distanceToWorkshop / 40) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>۰ متر</span>
+                    <span className="font-bold text-slate-600">سقف مجاز: ۲۰ متر</span>
+                    <span>۴۰+ متر</span>
+                  </div>
+                </div>
+
+                {/* GPS Options: Real GPS button + Presets strictly around 20m */}
+                <div className="pt-2 border-t border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-slate-600">موقعیت‌یابی:</span>
+                    <button
+                      type="button"
+                      onClick={handleGetRealGps}
+                      disabled={isGettingRealGps}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Navigation className="w-3 h-3" />
+                      <span>{isGettingRealGps ? 'دریافت GPS...' : 'دریافت GPS واقعی گوشی'}</span>
+                    </button>
+                  </div>
+
+                  {gpsError && (
+                    <p className="text-[11px] text-rose-600">{gpsError}</p>
+                  )}
+
+                  {/* Distance Presets */}
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setTestDistance('INSIDE')}
+                      className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 text-[11px] font-medium text-slate-700 cursor-pointer"
+                    >
+                      داخل سالن (۴ متر ✅)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestDistance('ENTRANCE')}
+                      className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-emerald-500 text-[11px] font-medium text-slate-700 cursor-pointer"
+                    >
+                      درب ورودی (۱۶ متر ✅)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestDistance('OUTSIDE')}
+                      className="py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:border-rose-500 text-[11px] font-medium text-slate-700 cursor-pointer"
+                    >
+                      بیرون کارگاه (۳۸ متر ❌)
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Scan Trigger Button */}
-              <button
-                type="button"
-                onClick={handleSimulateScan}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-              >
-                <ScanLine className="w-4 h-4 text-indigo-400" />
-                <span>شبیه‌سازی اسکن QR توسط گوشی کارمند</span>
-              </button>
-
-              {/* Result Notification Box */}
+              {/* Feedback Alert */}
               {scanResult && (
                 <div
-                  className={`p-4 rounded-2xl border text-xs leading-relaxed animate-in fade-in duration-200 ${
+                  className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 ${
                     scanResult.success
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                      : 'bg-rose-50 border-rose-200 text-rose-900'
+                      ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-900 border border-rose-200'
                   }`}
                 >
-                  <div className="flex items-center gap-2 font-bold mb-1">
-                    {scanResult.success ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  {scanResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <div className="font-bold">{scanResult.message}</div>
+                    {scanResult.distance !== undefined && (
+                      <div className="text-[11px] opacity-80 mt-0.5">
+                        فاصله مکانی ثبت‌شده: {formatNumberFa(scanResult.distance)} متر
+                      </div>
                     )}
-                    <span>{scanResult.success ? 'عملیات موفقیت‌آمیز' : 'خطای احراز تردد'}</span>
                   </div>
-                  <p>{scanResult.message}</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Architectural Notes */}
-          <div className="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
-            <span>
-              پروتکل امنیتی: کدهای منقضی‌شده پس از ۳۰ ثانیه در دیتابیس باطل شده و پاسخ HTTP 403 بازمی‌گردانند.
-            </span>
+          {/* Action Trigger Button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleExecutePunch}
+              className={`w-full py-3.5 px-6 rounded-2xl text-xs font-bold text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
+                !isWithin20Meters
+                  ? 'bg-slate-700 hover:bg-slate-800'
+                  : actionType === 'IN'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                  : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+              }`}
+            >
+              <Fingerprint className="w-4 h-4" />
+              <span>
+                {!isWithin20Meters
+                  ? 'ثبت تردد (فاصله بیش از ۲۰ متر رد می‌شود)'
+                  : actionType === 'IN'
+                  ? `تایید و ثبت ورود پرسنل (${selectedWorkshop.name.split(' (')[0]})`
+                  : `تایید و ثبت خروج پرسنل (${selectedWorkshop.name.split(' (')[0]})`}
+              </span>
+            </button>
           </div>
         </div>
       </div>

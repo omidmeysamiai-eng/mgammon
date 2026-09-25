@@ -228,9 +228,87 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         </div>
       </div>
 
-      {/* Attendance Records Table */}
+      {/* Attendance Records: Cards (Mobile) & Table (Desktop) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredRecords.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              رکوردی برای تاریخ و فیلتر انتخاب شده ثبت نشده است.
+            </div>
+          ) : (
+            filteredRecords.map((rec) => {
+              const emp = employees.find((e) => e.id === rec.employeeId);
+              return (
+                <div key={rec.id} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs sm:text-sm">
+                        {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {emp?.position} <span className="font-mono text-slate-500">({emp?.personalCode})</span>
+                      </div>
+                    </div>
+                    <div>{getStatusBadge(rec.status, rec.lateMinutes)}</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">ساعت ورود:</span>
+                      {rec.checkInTime ? (
+                        <span className="font-mono font-bold text-emerald-700 flex items-center gap-1 mt-0.5">
+                          <LogIn className="w-3 h-3 text-emerald-500" />
+                          {rec.checkInTime}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono">-</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">ساعت خروج:</span>
+                      {rec.checkOutTime ? (
+                        <span className="font-mono font-bold text-rose-700 flex items-center gap-1 mt-0.5">
+                          <LogOut className="w-3 h-3 text-rose-500" />
+                          {rec.checkOutTime}
+                        </span>
+                      ) : rec.checkInTime ? (
+                        <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                          در حال کار
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono">-</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">کارکرد مفید:</span>
+                      <span className="font-semibold text-slate-800">
+                        {minutesToHoursAndMinutes(rec.workDurationMinutes)}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">اضافه‌کاری:</span>
+                      <span className="font-mono font-semibold text-indigo-600">
+                        {rec.overtimeMinutes > 0 ? `+${rec.overtimeMinutes} دقیقه` : '۰'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                    <span>تاریخ: <strong className="font-mono text-slate-600">{rec.date}</strong></span>
+                    <div>{getMethodBadge(rec.checkInMethod)}</div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>

@@ -174,9 +174,85 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
         </span>
       </div>
 
-      {/* Leaves Table */}
+      {/* Leaves: Cards (Mobile) & Table (Desktop) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredLeaves.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              هیچ درخواست مرخصی با این مشخصات ثبت نشده است.
+            </div>
+          ) : (
+            filteredLeaves.map((req) => (
+              <div key={req.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-slate-900 text-sm">
+                      {req.employeeName}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {getLeaveTypeBadge(req.type)}
+                      <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                        {req.type === 'HOURLY'
+                          ? `${req.durationHours || 2} ساعت`
+                          : `${req.durationDays || 1} روز`}
+                      </span>
+                    </div>
+                  </div>
+                  <div>{getStatusBadge(req.status)}</div>
+                </div>
+
+                <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">بازه تاریخی:</span>
+                    <span className="font-mono text-slate-700">
+                      {req.type === 'HOURLY' ? (
+                        `${req.startDate} (${req.startTime} الی ${req.endTime})`
+                      ) : (
+                        `${req.startDate} ${req.startDate !== req.endDate ? `تا ${req.endDate}` : ''}`
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-2 pt-1 border-t border-slate-200/60">
+                    <span className="text-slate-400 shrink-0">دلیل:</span>
+                    <span className="text-slate-700 text-right">{req.reason}</span>
+                  </div>
+
+                  {req.reviewedBy && (
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60 text-slate-500">
+                      <span>بررسی: <strong>{req.reviewedBy}</strong></span>
+                      <span className="text-[10px] text-slate-400">{req.reviewedAt}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manager Action Buttons on Mobile Card */}
+                {canApprove && req.status === 'PENDING' && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => handleApprove(req.id)}
+                      className="py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>تأیید مرخصی</span>
+                    </button>
+                    <button
+                      onClick={() => setRejectingId(req.id)}
+                      className="py-2 px-3 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 flex items-center justify-center gap-1.5 cursor-pointer border border-rose-200 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>رد درخواست</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>

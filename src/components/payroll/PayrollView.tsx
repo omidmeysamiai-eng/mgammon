@@ -202,9 +202,73 @@ export const PayrollView: React.FC<PayrollViewProps> = ({
         </span>
       </div>
 
-      {/* Payroll Table */}
+      {/* Payroll: Cards (Mobile) & Table (Desktop) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredSalaries.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              برای این دوره هنوز فیشی محاسبه نشده است. روی دکمه «محاسبه مجدد کارکرد و حقوق» کلیک کنید.
+            </div>
+          ) : (
+            filteredSalaries.map((sal) => {
+              const emp = employees.find((e) => e.id === sal.employeeId);
+              const allowances = (sal.housingAllowance || 0) + (sal.groceryAllowance || 0) + (sal.bonusesTotal || 0);
+              const deductions = (sal.insuranceDeduction || 0) + (sal.taxDeduction || 0) + (sal.advancesTotal || 0);
+
+              return (
+                <div key={sal.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-slate-900 text-sm">
+                        {emp ? `${emp.firstName} ${emp.lastName}` : sal.employeeId}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {emp?.position} <span className="font-mono text-slate-500">({emp?.personalCode})</span>
+                      </div>
+                    </div>
+                    <div>{getStatusBadge(sal.status)}</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">حقوق پایه:</span>
+                      <span className="font-mono font-medium text-slate-700">{formatCurrencyTomans(sal.baseSalary)}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">اضافه‌کاری ({sal.overtimeHours} ساعت):</span>
+                      <span className="font-mono font-semibold text-indigo-600">+{formatCurrencyTomans(sal.overtimeAmount)}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">کسورات (مساعده + بیمه):</span>
+                      <span className="font-mono font-medium text-rose-600">-{formatCurrencyTomans(deductions)}</span>
+                    </div>
+
+                    <div className="bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-100 col-span-2 flex items-center justify-between">
+                      <span className="text-emerald-900 font-bold text-xs">خالص پرداختی:</span>
+                      <span className="font-mono font-bold text-emerald-700 text-sm">
+                        {formatCurrencyTomans(sal.netSalary)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewingPayslip(sal)}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-indigo-200/80"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>مشاهده و چاپ فیش رسمی حقوق</span>
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>

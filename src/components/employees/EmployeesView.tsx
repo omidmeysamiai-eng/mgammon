@@ -59,8 +59,11 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     nationalCode: '',
     phone: '',
     email: '',
-    department: 'فناوری و مهندسی',
+    department: 'تولید و ساخت',
     position: '',
+    workshopId: 'ws_1',
+    username: '',
+    password: '123',
     hireDate: getTodayShamsi(),
     status: 'ACTIVE',
     shiftId: shifts[0]?.id || '',
@@ -110,6 +113,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       email: emp.email,
       department: emp.department,
       position: emp.position,
+      workshopId: emp.workshopId || 'ws_1',
+      username: emp.username || '',
+      password: emp.password || '123',
       hireDate: emp.hireDate,
       status: emp.status,
       shiftId: emp.shiftId,
@@ -251,9 +257,95 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
         </div>
       </div>
 
-      {/* Employees Table */}
+      {/* Employees Table (Desktop) & Cards (Mobile) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block sm:hidden divide-y divide-slate-100">
+          {filteredEmployees.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              هیچ کارمندی با مشخصات وارد شده یافت نشد.
+            </div>
+          ) : (
+            filteredEmployees.map((emp) => {
+              const shift = shifts.find((s) => s.id === emp.shiftId) || shifts[0];
+              return (
+                <div key={emp.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        {emp.firstName.charAt(0)}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 text-sm">
+                          {emp.firstName} {emp.lastName}
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium mt-0.5">
+                          {emp.position} <span className="text-slate-300">|</span> {emp.department}
+                        </div>
+                      </div>
+                    </div>
+                    <div>{getStatusBadge(emp.status)}</div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">کد پرسنلی:</span>
+                      <span className="font-mono font-medium text-slate-700">{emp.personalCode}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">حقوق پایه:</span>
+                      <span className="font-semibold text-slate-800">{formatCurrencyTomans(emp.baseSalary)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">شیفت:</span>
+                      <span className="text-slate-700">{shift?.name || 'شیفت عادی'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">تماس:</span>
+                      <a href={`tel:${emp.phone}`} className="text-indigo-600 font-mono flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        <span>{emp.phone}</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      onClick={() => setViewingProfile(emp)}
+                      className="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>مشاهده پرونده کامل</span>
+                    </button>
+
+                    {canEdit && (
+                      <div className="flex items-center gap-1 mr-2">
+                        <button
+                          onClick={() => handleOpenEditModal(emp)}
+                          className="p-1.5 rounded-lg text-slate-600 bg-slate-100 hover:bg-amber-100 hover:text-amber-700 transition-colors"
+                          title="ویرایش"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(emp.id, `${emp.firstName} ${emp.lastName}`)}
+                          className="p-1.5 rounded-lg text-slate-400 bg-slate-100 hover:bg-rose-100 hover:text-rose-700 transition-colors"
+                          title="حذف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>
@@ -628,6 +720,81 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     <option value="INACTIVE">غیرفعال</option>
                     <option value="ON_LEAVE">در مرخصی</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    کارگاه محل خدمت <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formData.workshopId}
+                    onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
+                    className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 bg-white font-medium"
+                  >
+                    <option value="ws_1">کارگاه ۱ (اصلی - تولید و ساخت)</option>
+                    <option value="ws_2">کارگاه ۲ (فرعی - انبار و مونتاژ)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    کد ملی <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.nationalCode}
+                    onChange={(e) => setFormData({ ...formData, nationalCode: e.target.value })}
+                    className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                    placeholder="۰۰XXXXXXXX"
+                  />
+                </div>
+              </div>
+
+              {/* Portal Login Credentials Section */}
+              <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-200/80 space-y-3">
+                <div className="text-xs font-bold text-indigo-950 flex items-center justify-between">
+                  <span>اطلاعات پرتال و دسترسی کاربری کارمند</span>
+                  <span className="text-[10px] text-indigo-700 font-normal">ایجاد همزمان نام کاربری و رمز</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      نام کاربری (Username)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.username || ''}
+                      onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                      className="w-full text-xs p-2 rounded-lg border border-indigo-200 bg-white font-mono focus:outline-none focus:border-indigo-600"
+                      placeholder="مثال: ali.karimi"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                      کلمه عبور ورود (Password)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.password || ''}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className="w-full text-xs p-2 rounded-lg border border-indigo-200 bg-white font-mono focus:outline-none focus:border-indigo-600"
+                      placeholder="حداقل ۶ کاراکتر"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                    ایمیل / جیمیل اختصاصی (جهت ورود با جیمیل)
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full text-xs p-2 rounded-lg border border-indigo-200 bg-white font-mono focus:outline-none focus:border-indigo-600"
+                    placeholder="user@gmail.com"
+                  />
                 </div>
               </div>
 

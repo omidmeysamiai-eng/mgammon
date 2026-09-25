@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  UserCheck,
   Clock,
   LogIn,
   LogOut,
@@ -9,12 +8,14 @@ import {
   Wallet,
   CreditCard,
   CheckCircle,
-  AlertCircle,
-  Sparkles,
   QrCode,
   MapPin,
-  Eye,
-  Building
+  Building,
+  Camera,
+  Bell,
+  MessageSquare,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 import {
   Employee,
@@ -22,14 +23,14 @@ import {
   LeaveRequest,
   AdvanceRequest,
   SalaryRecord,
-  User
+  User,
+  BroadcastMessage
 } from '../../types';
 import { StorageService } from '../../services/storage';
 import {
   formatCurrencyTomans,
   formatNumberFa,
   getTodayShamsiDetailed,
-  formatShamsiDate
 } from '../../utils/dateUtils';
 import { NavTab } from '../common/Sidebar';
 
@@ -69,6 +70,27 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     text: string;
   } | null>(null);
 
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(
+    currentEmployee?.avatarUrl || null
+  );
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        setAvatarPreview(base64);
+        if (currentEmployee) {
+          const updated = { ...currentEmployee, avatarUrl: base64 };
+          StorageService.updateEmployee(updated);
+          onRefresh();
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleQuickClockIn = () => {
     if (!currentEmployee) return;
     const res = StorageService.clockIn(currentEmployee.id, 'MANUAL');
@@ -83,31 +105,70 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
     onRefresh();
   };
 
-  // My requests and salary records
+  // My requests, salary records and relevant messages
   const myLeaves = leaves.filter((l) => l.employeeId === currentEmployee?.id);
   const myAdvances = advances.filter((a) => a.employeeId === currentEmployee?.id);
   const mySalaries = salaries.filter((s) => s.employeeId === currentEmployee?.id);
   const myAttendanceHistory = attendance.filter((a) => a.employeeId === currentEmployee?.id);
 
+  // Workshop messages
+  const allMessages = StorageService.getMessages();
+  const myMessages = allMessages.filter(
+    (m) =>
+      m.recipientType === 'ALL' ||
+      (m.recipientType === 'WORKSHOP_1' && (!currentEmployee?.workshopId || currentEmployee?.workshopId === 'ws_1')) ||
+      (m.recipientType === 'WORKSHOP_2' && currentEmployee?.workshopId === 'ws_2') ||
+      (m.recipientIds && currentEmployee && m.recipientIds.includes(currentEmployee.id))
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Employee Greeting & Info Banner */}
+    <div className="space-y-6 w-full max-w-full">
+      {/* Employee Clean Profile Banner */}
       <div className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-md">
-            {currentEmployee?.firstName?.charAt(0) || 'ک'}
+          {/* Avatar with photo upload */}
+          <div className="relative group shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-md overflow-hidden">
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt={currentEmployee?.firstName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{currentEmployee?.firstName?.charAt(0) || 'ک'}</span>
+              )}
+            </div>
+            <label
+              htmlFor="avatar-upload"
+              className="absolute -bottom-1 -left-1 w-6 h-6 bg-slate-900 text-white rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-indigo-600 transition-colors"
+              title="بارگذاری یا تغییر عکس پرسنلی"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </label>
           </div>
+
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg lg:text-xl font-bold text-slate-800">
-                پرتال شخصی {currentEmployee?.firstName} {currentEmployee?.lastName}
+                {currentEmployee?.firstName} {currentEmployee?.lastName}
               </h2>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                {currentEmployee?.personalCode}
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                کد پرسنلی: {currentEmployee?.personalCode}
+              </span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {currentEmployee?.workshopId === 'ws_2' ? 'کارگاه ۲ (انبار و مونتاژ)' : 'کارگاه ۱ (اصلی - تولید)'}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              {currentEmployee?.position} | {currentEmployee?.department} | مانده مرخصی سالانه:{' '}
+              سمت: <strong>{currentEmployee?.position}</strong> | واحد: <strong>{currentEmployee?.department}</strong> | مانده مرخصی سالانه:{' '}
               <span className="font-bold text-emerald-600">{currentEmployee?.remainingLeaveDays} روز</span>
             </p>
           </div>
@@ -119,7 +180,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-semibold transition-colors cursor-pointer"
           >
             <QrCode className="w-4 h-4 text-indigo-600" />
-            <span>ثبت تردد با کیوسک QR شرکت</span>
+            <span>ثبت با کیوسک QR کارگاه</span>
           </button>
         </div>
       </div>
@@ -129,9 +190,9 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <div className="text-xs text-indigo-300 font-medium mb-1">
-              ثبت حضور و غیاب امروز ({shamsi.dayOfWeek} {shamsi.dateString})
+              تردد امروز ({shamsi.dayOfWeek} {shamsi.dateString})
             </div>
-            <h3 className="text-xl font-bold">
+            <h3 className="text-lg sm:text-xl font-bold">
               {todayRecord?.checkInTime && todayRecord?.checkOutTime
                 ? 'تردد امروز شما کامل ثبت گردیده است'
                 : todayRecord?.checkInTime
@@ -143,6 +204,10 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
           <div className="flex items-center gap-2 text-xs">
             <span className="px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
               شیفت: ۰۸:۰۰ الی ۱۷:۰۰
+            </span>
+            <span className="px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-700 text-emerald-300 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" />
+              محدوده مجاز ۲۰ متر
             </span>
           </div>
         </div>
@@ -162,7 +227,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             <span>
               {todayRecord?.checkInTime
                 ? `ورود در ${todayRecord.checkInTime} ثبت شد`
-                : 'ثبت ورود به شرکت (Check In)'}
+                : 'ثبت ورود به کارگاه'}
             </span>
           </button>
 
@@ -181,7 +246,7 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
             <span>
               {todayRecord?.checkOutTime
                 ? `خروج در ${todayRecord.checkOutTime} ثبت شد`
-                : 'ثبت خروج از شرکت (Check Out)'}
+                : 'ثبت خروج از کارگاه'}
             </span>
           </button>
         </div>
@@ -199,6 +264,38 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Workshop Announcements / Messages for Employee */}
+      {myMessages.length > 0 && (
+        <div className="bg-amber-50/60 border border-amber-200/80 p-4 rounded-2xl space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              <Bell className="w-4 h-4 text-amber-600" />
+              <span>آخرین اطلاعیه‌ها و پیام‌های ارسالی مدیریت کارگاه</span>
+            </h4>
+            <span className="text-[11px] text-amber-700 font-mono">
+              {formatNumberFa(myMessages.length)} پیام
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {myMessages.slice(0, 2).map((msg) => (
+              <div
+                key={msg.id}
+                className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800">{msg.title}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">{msg.sentAt.split(' - ')[0]}</span>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                  {msg.content}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 3 Quick Action Shortcuts (Leaves, Advances, Payslips) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -312,16 +409,71 @@ export const EmployeePortalView: React.FC<EmployeePortalViewProps> = ({
         </div>
       </div>
 
-      {/* Attendance History of Current Employee */}
+      {/* Attendance History */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h4 className="font-bold text-slate-800 text-xs flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-600" />
             <span>سوابق تردد اخیر شما</span>
           </h4>
+          <span className="text-[11px] text-slate-400 font-mono">
+            {myAttendanceHistory.length} رکورد
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block sm:hidden divide-y divide-slate-100">
+          {myAttendanceHistory.length === 0 ? (
+            <div className="py-6 text-center text-slate-400 text-xs">
+              سابقه‌ای برای نمایش وجود ندارد.
+            </div>
+          ) : (
+            myAttendanceHistory.map((rec) => (
+              <div key={rec.id} className="p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-slate-800">{rec.date}</span>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">
+                    {rec.status === 'PRESENT'
+                      ? 'حاضر'
+                      : rec.status === 'LATE'
+                      ? 'تأخیر'
+                      : rec.status === 'ON_LEAVE'
+                      ? 'مرخصی'
+                      : 'غیبت'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2 rounded-xl border border-slate-100 font-mono">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">ساعت ورود:</span>
+                    <span className="font-semibold text-emerald-700">{rec.checkInTime || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">ساعت خروج:</span>
+                    <span className="font-semibold text-rose-700">
+                      {rec.checkOutTime || (rec.checkInTime ? 'در حال کار' : '-')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">تأخیر:</span>
+                    <span className={rec.lateMinutes > 0 ? 'text-rose-600 font-semibold' : 'text-slate-500'}>
+                      {rec.lateMinutes > 0 ? `${rec.lateMinutes} دقیقه` : 'به‌موقع'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">اضافه‌کاری:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {rec.overtimeMinutes > 0 ? `+${rec.overtimeMinutes} د` : '۰'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>

@@ -1,6 +1,6 @@
 {
-  "name": "سامانه جامع منابع انسانی و حضور و غیاب",
-  "description": "سیستم جامع مدیریت پرسنل، حضور و غیاب هوشمند با QR داینامیک و GPS، شیفت کاری، مرخصی و مساعده، و محاسبه حقوق و دستمزد",
+  "name": "M.GOMMON | مجید نورایی",
+  "description": "سامانه مدیریت پرسنل کارگاهی، تردد هوشمند با QR و GPS با محدوده ۲۰ متری، شیفت، مرخصی، فیش حقوقی و پیام‌رسانی گروهی",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

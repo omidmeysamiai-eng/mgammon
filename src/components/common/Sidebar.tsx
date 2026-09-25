@@ -11,7 +11,7 @@ import {
   BarChart3,
   Settings,
   UserCheck,
-  FileCode2,
+  MessageSquare,
   ChevronLeft
 } from 'lucide-react';
 import { Role } from '../../types';
@@ -24,11 +24,11 @@ export type NavTab =
   | 'schedules'
   | 'leaves'
   | 'advances'
+  | 'messages'
   | 'payroll'
   | 'reports'
   | 'employee-portal'
-  | 'settings'
-  | 'docs';
+  | 'settings';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -48,47 +48,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
   pendingAdvancesCount,
 }) => {
   const activeRole = currentRole || role || 'ADMIN';
+
   const getNavItems = () => {
     if (activeRole === 'EMPLOYEE') {
       return [
-        { id: 'employee-portal' as NavTab, label: 'پرتال اختصاصی من', icon: UserCheck, count: 0 },
+        { id: 'employee-portal' as NavTab, label: 'میز کار من', icon: UserCheck, count: 0 },
         { id: 'attendance' as NavTab, label: 'سوابق تردد و کارکرد', icon: Clock, count: 0 },
+        { id: 'qr-kiosk' as NavTab, label: 'کیوسک تردد کارگاه', icon: QrCode, count: 0 },
         { id: 'leaves' as NavTab, label: 'درخواست‌های مرخصی', icon: PlaneTakeoff, count: 0 },
-        { id: 'advances' as NavTab, label: 'درخواست مساعده حقوق', icon: Wallet, count: 0 },
-        { id: 'payroll' as NavTab, label: 'فیش‌های حقوقی من', icon: CreditCard, count: 0 },
-        { id: 'qr-kiosk' as NavTab, label: 'ثبت با QR و GPS', icon: QrCode, count: 0 },
-        { id: 'docs' as NavTab, label: 'مستندات معماری و API', icon: FileCode2, count: 0 },
+        { id: 'advances' as NavTab, label: 'مساعده حقوق', icon: Wallet, count: 0 },
+        { id: 'payroll' as NavTab, label: 'فیش حقوقی', icon: CreditCard, count: 0 },
       ];
     }
 
     if (activeRole === 'MANAGER') {
       return [
         { id: 'dashboard' as NavTab, label: 'داشبورد مدیریتی', icon: LayoutDashboard, count: 0 },
-        { id: 'employees' as NavTab, label: 'پرسنل تحت مدیریت', icon: Users, count: 0 },
+        { id: 'employees' as NavTab, label: 'پرسنل کارگاه', icon: Users, count: 0 },
         { id: 'attendance' as NavTab, label: 'حضور و غیاب امروز', icon: Clock, count: 0 },
+        { id: 'qr-kiosk' as NavTab, label: 'کیوسک QR و تردد', icon: QrCode, count: 0 },
+        { id: 'messages' as NavTab, label: 'پیام‌رسانی و پیامک', icon: MessageSquare, count: 0 },
         { id: 'leaves' as NavTab, label: 'بررسی مرخصی‌ها', icon: PlaneTakeoff, count: pendingLeavesCount },
         { id: 'advances' as NavTab, label: 'بررسی مساعده‌ها', icon: Wallet, count: pendingAdvancesCount },
+        { id: 'payroll' as NavTab, label: 'حقوق و دستمزد', icon: CreditCard, count: 0 },
         { id: 'reports' as NavTab, label: 'گزارش‌های عملکردی', icon: BarChart3, count: 0 },
-        { id: 'qr-kiosk' as NavTab, label: 'کیوسک حضور و QR', icon: QrCode, count: 0 },
         { id: 'employee-portal' as NavTab, label: 'نمای پرتال پرسنل', icon: UserCheck, count: 0 },
-        { id: 'docs' as NavTab, label: 'مستندات معماری و API', icon: FileCode2, count: 0 },
+        { id: 'settings' as NavTab, label: 'تنظیمات کارگاه و شیفت', icon: Settings, count: 0 },
       ];
     }
 
     // ADMIN
     return [
-      { id: 'dashboard' as NavTab, label: 'داشبورد مدیریت', icon: LayoutDashboard, count: 0 },
-      { id: 'employees' as NavTab, label: 'مدیریت کارکنان', icon: Users, count: 0 },
-      { id: 'attendance' as NavTab, label: 'حضور و غیاب', icon: Clock, count: 0 },
-      { id: 'qr-kiosk' as NavTab, label: 'کیوسک QR داینامیک و GPS', icon: QrCode, count: 0 },
+      { id: 'dashboard' as NavTab, label: 'داشبورد مدیریت کل', icon: LayoutDashboard, count: 0 },
+      { id: 'employees' as NavTab, label: 'مدیریت پرسنل', icon: Users, count: 0 },
+      { id: 'attendance' as NavTab, label: 'حضور و غیاب پرسنل', icon: Clock, count: 0 },
+      { id: 'qr-kiosk' as NavTab, label: 'کیوسک QR و تردد (۲۰ متر)', icon: QrCode, count: 0 },
       { id: 'schedules' as NavTab, label: 'شیفت و تقویم کاری', icon: CalendarDays, count: 0 },
+      { id: 'messages' as NavTab, label: 'پیام‌رسانی و پنل پیامک', icon: MessageSquare, count: 0 },
       { id: 'leaves' as NavTab, label: 'مدیریت مرخصی‌ها', icon: PlaneTakeoff, count: pendingLeavesCount },
       { id: 'advances' as NavTab, label: 'مساعده و علی‌الحساب', icon: Wallet, count: pendingAdvancesCount },
       { id: 'payroll' as NavTab, label: 'حقوق و دستمزد', icon: CreditCard, count: 0 },
       { id: 'reports' as NavTab, label: 'گزارش‌ها و خروجی', icon: BarChart3, count: 0 },
-      { id: 'employee-portal' as NavTab, label: 'پرتال اختصاصی کارمند', icon: UserCheck, count: 0 },
-      { id: 'settings' as NavTab, label: 'تنظیمات و Audit Logs', icon: Settings, count: 0 },
-      { id: 'docs' as NavTab, label: 'معماری، دیتابیس و API', icon: FileCode2, count: 0 },
+      { id: 'employee-portal' as NavTab, label: 'میز کار پرسنلی', icon: UserCheck, count: 0 },
+      { id: 'settings' as NavTab, label: 'تنظیمات کارگاه‌ها', icon: Settings, count: 0 },
     ];
   };
 
@@ -99,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="space-y-1">
         <div className="px-3 py-2 mb-2">
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            منوی سامانه ({role === 'ADMIN' ? 'مدیریت کل' : role === 'MANAGER' ? 'مدیریت واحد' : 'پرتال پرسنلی'})
+            منوی سامانه ({activeRole === 'ADMIN' ? 'مدیریت ارشد' : activeRole === 'MANAGER' ? 'مدیریت منابع انسانی' : 'میز کار پرسنلی'})
           </p>
         </div>
 
@@ -139,18 +141,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* System Status info box at bottom of sidebar */}
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-slate-500 text-[11px] mt-6">
-        <div className="flex items-center justify-between font-semibold text-slate-700 mb-1">
-          <span>وضعیت سرور و پایگاه</span>
-          <span className="flex items-center gap-1 text-emerald-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            فعال
-          </span>
+      {/* Footer Branding in Sidebar */}
+      <div className="pt-4 border-t border-slate-100">
+        <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-200/60 text-center">
+          <div className="text-[11px] text-slate-600 font-semibold">
+            M.GOMMON | مجید نورایی
+          </div>
+          <a
+            href="https://ahourai.ir"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-slate-500 hover:text-indigo-600 block mt-1 font-medium transition-colors"
+          >
+            طراحی و توسعه توسط اهورایی ❤️
+          </a>
         </div>
-        <p className="text-slate-400 text-[10px] leading-relaxed">
-          نسخه ۱.۰.۰ | هماهنگ با تقویم خورشیدی و قوانین اداره کار
-        </p>
       </div>
     </aside>
   );

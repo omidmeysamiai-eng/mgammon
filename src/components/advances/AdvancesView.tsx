@@ -121,9 +121,90 @@ export const AdvancesView: React.FC<AdvancesViewProps> = ({
         </div>
       </div>
 
-      {/* Table */}
+      {/* Advances: Cards (Mobile) & Table (Desktop) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Cards */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {filteredAdvances.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs">
+              هیچ درخواست مساعده‌ای ثبت نشده است.
+            </div>
+          ) : (
+            filteredAdvances.map((adv) => (
+              <div key={adv.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-bold text-slate-900 text-sm">{adv.employeeName}</div>
+                    <div className="text-xs text-emerald-600 font-bold font-mono mt-0.5">
+                      {formatCurrencyTomans(adv.amount)}
+                    </div>
+                  </div>
+                  <div>
+                    {adv.status === 'APPROVED' ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle className="w-3 h-3" /> تأیید شده
+                      </span>
+                    ) : adv.status === 'REJECTED' ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        <XCircle className="w-3 h-3" /> رد شده
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                        <AlertCircle className="w-3 h-3" /> در انتظار تأیید
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">تاریخ درخواست:</span>
+                    <span className="font-mono text-slate-700">{adv.requestDate}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">کسر از حقوق ماه:</span>
+                    <span className="font-mono font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                      {adv.repayMonth}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-2 pt-1 border-t border-slate-200/60">
+                    <span className="text-slate-400 shrink-0">علت درخواست:</span>
+                    <span className="text-slate-700 text-right">{adv.reason}</span>
+                  </div>
+                  {adv.reviewedBy && (
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60 text-slate-500">
+                      <span>بررسی: <strong>{adv.reviewedBy}</strong></span>
+                      <span className="text-[10px] text-slate-400">{adv.reviewedAt}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manager Action Buttons on Mobile Card */}
+                {canApprove && adv.status === 'PENDING' && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => handleApprove(adv.id)}
+                      className="py-2 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>موافقت و پرداخت</span>
+                    </button>
+                    <button
+                      onClick={() => setRejectingId(adv.id)}
+                      className="py-2 px-3 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 flex items-center justify-center gap-1.5 cursor-pointer border border-rose-200 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>رد درخواست</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200/80 font-semibold">
               <tr>

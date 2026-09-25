@@ -8,28 +8,52 @@ import {
   SalaryRecord,
   AuditLog,
   User,
-  BonusOrPenalty
+  BonusOrPenalty,
+  Workshop,
+  BroadcastMessage
 } from '../types';
 import { getTodayShamsi } from '../utils/dateUtils';
 
 const today = getTodayShamsi();
 
 export const initialCompanySettings: CompanySettings = {
-  id: 'comp_iran_tech_01',
-  companyName: 'شرکت مهندسی فناوران ایده نوین',
-  companyCode: 'COMP-1084',
+  id: 'comp_mgommon_01',
+  companyName: 'M.GOMMON | مجید نورایی',
+  companyCode: 'MG-101',
+  ownerName: 'مجید نورایی',
   logoUrl: '',
-  address: 'تهران، خیابان ولیعصر، بالاتر از میدان ونک، برج نگین، طبقه ۸',
-  phoneNumber: '۰۲۱-۸۸۸۸۱۹۲۰',
-  officeLat: 35.7575, // Vaniq area, Tehran
-  officeLng: 51.4100,
-  allowedGpsRadiusMeters: 150, // 150 meters geo-fence
-  qrRefreshIntervalSeconds: 30, // dynamic QR rotates every 30 seconds
+  address: 'مجموعه کارگاهی M.GOMMON (کارگاه شماره ۱ و ۲)',
+  phoneNumber: '۰۲۱-۶۶۵۵۴۴۳۳',
+  officeLat: 35.75750,
+  officeLng: 51.41000,
+  allowedGpsRadiusMeters: 20, // فاصله مجاز حداکثر ۲۰ متر
+  workshops: [
+    {
+      id: 'ws_1',
+      name: 'کارگاه ۱ (اصلی - تولید و ساخت)',
+      code: 'کارگاه ۱',
+      lat: 35.75750,
+      lng: 51.41000,
+      allowedRadiusMeters: 20,
+      address: 'کارگاه شماره ۱ - سالن اصلی تولید'
+    },
+    {
+      id: 'ws_2',
+      name: 'کارگاه ۲ (فرعی - مونتاژ و انبار)',
+      code: 'کارگاه ۲',
+      lat: 35.75764,
+      lng: 51.41015,
+      allowedRadiusMeters: 20,
+      address: 'کارگاه شماره ۲ - واحد مجاور سالن تولید'
+    }
+  ],
+  smsSenderNumber: '500040001084',
+  qrRefreshIntervalSeconds: 30, // چرخش امنیتی QR هر ۳۰ ثانیه
   workDaysPerMonth: 22,
-  insuranceRatePercent: 7, // 7% employee share
+  insuranceRatePercent: 7, // ۷٪ سهم بیمه کارگر
   taxRatePercent: 10,
   fixedHousingAllowance: 900000, // حق مسکن (تومان)
-  fixedGroceryAllowance: 1400000, // بن کارگری (تومان)
+  fixedGroceryAllowance: 1400000, // بن خواربار (تومان)
 };
 
 export const initialShifts: Shift[] = [
@@ -246,43 +270,51 @@ export const initialEmployees: Employee[] = [
 export const initialUsers: User[] = [
   {
     id: 'usr_admin',
-    companyId: 'comp_iran_tech_01',
+    companyId: 'comp_mgommon_01',
     employeeId: 'emp_01',
     username: 'admin',
-    name: 'علیرضا صادقی (مدیر ارشد)',
-    email: 'a.sadeghi@novintech.ir',
+    password: '123',
+    name: 'مجید نورایی',
+    email: 'm.nouraei@mgommon.ir',
     phone: '۰۹۱۲۱۱۱۱۱۱۱',
-    role: 'ADMIN'
+    role: 'ADMIN',
+    workshopId: 'ws_1'
   },
   {
     id: 'usr_manager',
-    companyId: 'comp_iran_tech_01',
+    companyId: 'comp_mgommon_01',
     employeeId: 'emp_02',
     username: 'manager',
-    name: 'سارا محمدی (مدیر منابع انسانی)',
-    email: 's.mohammadi@novintech.ir',
+    password: '123',
+    name: 'سارا محمدی',
+    email: 's.mohammadi@mgommon.ir',
     phone: '۰۹۱۲۲۲۲۲۲۲۲',
-    role: 'MANAGER'
+    role: 'MANAGER',
+    workshopId: 'ws_1'
   },
   {
     id: 'usr_emp_karimi',
-    companyId: 'comp_iran_tech_01',
+    companyId: 'comp_mgommon_01',
     employeeId: 'emp_03',
     username: 'a.karimi',
-    name: 'علی کریمی (کارمند)',
-    email: 'a.karimi@novintech.ir',
+    password: '123',
+    name: 'علی کریمی',
+    email: 'a.karimi@mgommon.ir',
     phone: '۰۹۱۲۳۳۳۳۳۳۳',
-    role: 'EMPLOYEE'
+    role: 'EMPLOYEE',
+    workshopId: 'ws_1'
   },
   {
     id: 'usr_emp_hosseini',
-    companyId: 'comp_iran_tech_01',
+    companyId: 'comp_mgommon_01',
     employeeId: 'emp_04',
     username: 'm.hosseini',
-    name: 'مریم حسینی (طراح محصول)',
-    email: 'm.hosseini@novintech.ir',
+    password: '123',
+    name: 'مریم حسینی',
+    email: 'm.hosseini@mgommon.ir',
     phone: '۰۹۱۲۴۴۴۴۴۴۴',
-    role: 'EMPLOYEE'
+    role: 'EMPLOYEE',
+    workshopId: 'ws_2'
   }
 ];
 
@@ -675,5 +707,44 @@ export const initialAuditLogs: AuditLog[] = [
     details: 'ثبت ورود دستی ساعت ۰۸:۱۲ به دلیل اختلال موقت اینترنت گوشی',
     timestamp: `${today} - ۰۸:۲۰`,
     ipAddress: '192.168.1.72'
+  }
+];
+
+export const initialBroadcastMessages: BroadcastMessage[] = [
+  {
+    id: 'msg_01',
+    companyId: 'comp_mgommon_01',
+    senderName: 'مجید نورایی (مدیریت کارگاه)',
+    recipientType: 'ALL',
+    title: 'جلسه هماهنگی کارگاه ۱ و ۲',
+    content: 'همکاران گرامی کارگاه ۱ و ۲، فردا ساعت ۸:۳۰ صبح جلسه هماهنگی تحویل سفارشات هفتگی در سالن اصلی برگزار می‌شود. حضور به موقع الزامی است.',
+    channel: 'BOTH',
+    sentAt: `${today} - ۰۹:۰۰`,
+    status: 'DELIVERED',
+    partsCount: 1
+  },
+  {
+    id: 'msg_02',
+    companyId: 'comp_mgommon_01',
+    senderName: 'سارا محمدی (امور اداری و مالی)',
+    recipientType: 'ALL',
+    title: 'واریز حقوق و صدور فیش‌ها',
+    content: 'فیش‌های حقوقی شهریور ماه نهایی و مبالغ به شماره شبای بانکی واریز گردید. می‌توانید از بخش فیش حقوقی نسخه PDF یا پرینت را دریافت کنید.',
+    channel: 'SMS',
+    sentAt: '۱۴۰۳/۰۶/۳۱ - ۱۵:۳۰',
+    status: 'DELIVERED',
+    partsCount: 1
+  },
+  {
+    id: 'msg_03',
+    companyId: 'comp_mgommon_01',
+    senderName: 'مجید نورایی',
+    recipientType: 'WORKSHOP_1',
+    title: 'رعایت فاصله مجاز ۲۰ متری هنگام ثبت تردد',
+    content: 'توجه: سامانه موقعیت مکانی برای ثبت ورود و خروج دقیقا روی ۲۰ متر شعاع کارگاه تنظیم شده است. لطفاً داخل محوطه کارگاه حضور خود را ثبت نمایید.',
+    channel: 'IN_APP',
+    sentAt: `${today} - ۰۷:۴۵`,
+    status: 'DELIVERED',
+    partsCount: 1
   }
 ];
