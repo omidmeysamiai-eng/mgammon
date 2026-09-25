@@ -15,9 +15,13 @@ import {
   LogIn,
   CheckCircle2,
   AlertCircle,
-  X
+  X,
+  Camera,
+  UserCog,
+  Upload,
+  Save
 } from 'lucide-react';
-import { User, Role } from '../../types';
+import { User, Role, CompanySettings } from '../../types';
 import { getTodayShamsiDetailed } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
 
@@ -28,6 +32,7 @@ interface HeaderProps {
   pendingRequestsCount: number;
   onNavigateToRequests?: () => void;
   onToggleMobileMenu?: () => void;
+  settings?: CompanySettings;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,11 +42,23 @@ export const Header: React.FC<HeaderProps> = ({
   pendingRequestsCount,
   onNavigateToRequests,
   onToggleMobileMenu,
+  settings: settingsProp,
 }) => {
   const shamsi = getTodayShamsiDetailed();
   const [timeStr, setTimeStr] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // Profile Edit Form State
+  const [profileData, setProfileData] = useState({
+    name: currentUser.name,
+    phone: currentUser.phone,
+    email: currentUser.email,
+    avatarUrl: currentUser.avatarUrl || '',
+    password: currentUser.password || '',
+  });
+  const [profileSuccessMsg, setProfileSuccessMsg] = useState<string | null>(null);
 
   // Login Modal Form State
   const [loginMethod, setLoginMethod] = useState<'PASSWORD' | 'FINGERPRINT' | 'GOOGLE'>('PASSWORD');
@@ -52,7 +69,17 @@ export const Header: React.FC<HeaderProps> = ({
   const [isProcessingBiometric, setIsProcessingBiometric] = useState(false);
 
   const users = StorageService.getUsers();
-  const settings = StorageService.getSettings();
+  const settings = settingsProp || StorageService.getSettings();
+
+  React.useEffect(() => {
+    setProfileData({
+      name: currentUser.name,
+      phone: currentUser.phone,
+      email: currentUser.email,
+      avatarUrl: currentUser.avatarUrl || '',
+      password: currentUser.password || '',
+    });
+  }, [currentUser]);
 
   React.useEffect(() => {
     const updateTime = () => {
@@ -93,6 +120,54 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const handleProfileImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData((prev) => ({ ...prev, avatarUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updatedUser: User = {
+      ...currentUser,
+      name: profileData.name.trim(),
+      phone: profileData.phone.trim(),
+      email: profileData.email.trim(),
+      avatarUrl: profileData.avatarUrl.trim(),
+      password: profileData.password ? profileData.password.trim() : currentUser.password,
+    };
+
+    StorageService.updateUser(updatedUser);
+
+    // If associated with employee, update employee record too
+    if (currentUser.employeeId) {
+      const employees = StorageService.getEmployees();
+      const emp = employees.find((x) => x.id === currentUser.employeeId);
+      if (emp) {
+        StorageService.updateEmployee({
+          ...emp,
+          firstName: updatedUser.name.split(' ')[0] || emp.firstName,
+          lastName: updatedUser.name.split(' ').slice(1).join(' ') || emp.lastName,
+          phone: updatedUser.phone,
+          email: updatedUser.email,
+          avatarUrl: updatedUser.avatarUrl,
+        });
+      }
+    }
+
+    onUserChange(updatedUser);
+    setProfileSuccessMsg('اطلاعات و تصویر پروفایل با موفقیت ذخیره گردید.');
+    setTimeout(() => {
+      setProfileSuccessMsg(null);
+      setIsProfileModalOpen(false);
+    }, 1200);
+  };
+
   const handlePasswordLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
@@ -126,7 +201,6 @@ export const Header: React.FC<HeaderProps> = ({
 
     setTimeout(() => {
       setIsProcessingBiometric(false);
-      // Log in as employee or current user
       const empUser = users.find((u) => u.role === 'EMPLOYEE') || users[0];
       setAuthSuccess(`اثر انگشت تأیید شد. ورود به عنوان ${empUser.name}`);
       setTimeout(() => {
@@ -140,7 +214,6 @@ export const Header: React.FC<HeaderProps> = ({
   const handleGoogleLogin = () => {
     setAuthSuccess(null);
     setAuthError(null);
-    // Find employee with email or admin
     const gUser = users.find((u) => u.email.includes('mgommon')) || users[0];
     setAuthSuccess(`ورود موفق از طریق حساب گوگل: ${gUser.email}`);
     setTimeout(() => {
@@ -167,9 +240,17 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0">
-                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
-              </div>
+              {settings.logoUrl ? (
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.companyName || 'M.GOMMON'}
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-contain border border-slate-200/80 shadow-xs shrink-0 bg-white p-0.5"
+                />
+              ) : (
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0">
+                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <h1 className="font-bold text-slate-800 text-sm sm:text-base lg:text-lg tracking-tight truncate max-w-[150px] sm:max-w-none">
@@ -236,8 +317,12 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 pl-2 sm:pl-3 pr-2 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all text-right cursor-pointer"
               >
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-                  {currentUser.name.charAt(0)}
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0 overflow-hidden">
+                  {currentUser.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    currentUser.name.charAt(0)
+                  )}
                 </div>
                 <div className="hidden sm:block text-right">
                   <div className="text-xs font-semibold text-slate-800 truncate max-w-[120px]">
@@ -281,11 +366,15 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <div className="flex items-center gap-2">
                             <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden ${
                                 isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
                               }`}
                             >
-                              {u.name.charAt(0)}
+                              {u.avatarUrl ? (
+                                <img src={u.avatarUrl} alt={u.name} className="w-full h-full object-cover" />
+                              ) : (
+                                u.name.charAt(0)
+                              )}
                             </div>
                             <div>
                               <div className="text-xs text-slate-800 font-medium">{u.name}</div>
@@ -298,8 +387,21 @@ export const Header: React.FC<HeaderProps> = ({
                     })}
                   </div>
 
-                  {/* Open dedicated login modal button */}
-                  <div className="p-2 border-t border-slate-100">
+                  {/* Actions in Dropdown */}
+                  <div className="p-2 border-t border-slate-100 space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDropdownOpen(false);
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-indigo-200"
+                    >
+                      <UserCog className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>ویرایش تصویر و مشخصات حساب کاربری</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={(e) => {
@@ -502,6 +604,189 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* USER & SENIOR MANAGER PROFILE EDIT MODAL */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-right">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <UserCog className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm">
+                    ویرایش تصویر و مشخصات حساب {currentUser.role === 'ADMIN' ? 'مدیر ارشد' : 'کاربری'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    امکان بارگذاری تصویر پرسنلی، شماره تماس، ایمیل و رمز عبور
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsProfileModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="p-6 space-y-4">
+              {profileSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{profileSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Photo Upload & Preview Card */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative group shrink-0">
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden bg-slate-200 border-2 border-white shadow-md flex items-center justify-center">
+                    {profileData.avatarUrl ? (
+                      <img
+                        src={profileData.avatarUrl}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-bold text-slate-500">
+                        {profileData.name.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <label className="absolute -bottom-1.5 -right-1.5 bg-indigo-600 text-white p-1.5 rounded-xl shadow-md cursor-pointer hover:bg-indigo-700 transition-colors">
+                    <Camera className="w-3.5 h-3.5" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfileImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-1.5 text-center sm:text-right min-w-0 flex-1">
+                  <span className="text-xs font-bold text-slate-800 block">
+                    تصویر پرسنلی / آواتار {currentUser.role === 'ADMIN' ? 'مدیر ارشد' : ''}
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    می‌توانید مستقیماً فایل عکس را انتخاب و بارگذاری کنید یا مسیر آن را وارد نمایید.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 justify-center sm:justify-start flex-wrap">
+                    <label className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1 transition-colors">
+                      <Upload className="w-3 h-3" />
+                      <span>انتخاب فایل عکس</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfileImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {profileData.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setProfileData((p) => ({ ...p, avatarUrl: '' }))}
+                        className="text-[11px] font-medium text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        حذف عکس
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Image URL input (host path or direct link) */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  یا درج آدرس مستقیم تصویر در هاست یا وب:
+                </label>
+                <input
+                  type="text"
+                  value={profileData.avatarUrl}
+                  onChange={(e) => setProfileData({ ...profileData, avatarUrl: e.target.value })}
+                  placeholder="مثال: /uploads/admin.jpg یا https://..."
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500 font-mono"
+                  dir="ltr"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    نام و نام خانوادگی:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={profileData.name}
+                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    شماره تماس همراه:
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.phone}
+                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    پست الکترونیکی (ایمیل):
+                  </label>
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    رمز عبور اختصاصی:
+                  </label>
+                  <input
+                    type="text"
+                    value={profileData.password}
+                    onChange={(e) => setProfileData({ ...profileData, password: e.target.value })}
+                    placeholder="کلمه عبور جهت ورود"
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-hidden focus:border-indigo-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  انصراف
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>ذخیره تغییرات پروفایل</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

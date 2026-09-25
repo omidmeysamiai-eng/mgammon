@@ -2,14 +2,14 @@
  * Solar Hijri (Shamsi / Jalali) Date & Currency Utilities
  */
 
-const PERSIAN_MONTHS = [
+export const PERSIAN_MONTHS = [
   'فروردین', 'اردیبهشت', 'خرداد',
   'تیر', 'مرداد', 'شهریور',
   'مهر', 'آبان', 'آذر',
   'دی', 'بهمن', 'اسفند'
 ];
 
-const PERSIAN_WEEKDAYS = [
+export const PERSIAN_WEEKDAYS = [
   'شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'
 ];
 
@@ -37,6 +37,48 @@ export function gregorianToJalali(gy: number, gm: number, gd: number): [number, 
     jd = 1 + ((days - 186) % 30);
   }
   return [jy, jm, jd];
+}
+
+// Convert Jalali date to Gregorian
+export function jalaliToGregorian(jy: number, jm: number, jd: number): [number, number, number] {
+  jy += 1595;
+  let days = -355668 + (365 * jy) + (Math.floor(jy / 33) * 8) + Math.floor(((jy % 33) + 3) / 4) + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+  let gy = 400 * Math.floor(days / 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy += 100 * Math.floor(--days / 36524);
+    days %= 36524;
+    if (days >= 365) days++;
+  }
+  gy += 4 * Math.floor(days / 1461);
+  days %= 1461;
+  if (days > 365) {
+    gy += Math.floor((days - 1) / 365);
+    days = (days - 1) % 365;
+  }
+  let gd = days + 1;
+  const sal_b = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 0;
+  for (gm = 0; gm < 13 && gd > sal_b[gm]; gm++) gd -= sal_b[gm];
+  return [gy, gm, gd];
+}
+
+export function isJalaliLeapYear(jy: number): boolean {
+  return ((((((jy - (jy > 0 ? 474 : 473)) % 2820) + 474) + 38) * 682) % 2816) < 682;
+}
+
+export function getDaysInJalaliMonth(jy: number, jm: number): number {
+  if (jm >= 1 && jm <= 6) return 31;
+  if (jm >= 7 && jm <= 11) return 30;
+  if (jm === 12) return isJalaliLeapYear(jy) ? 30 : 29;
+  return 30;
+}
+
+export function getJalaliMonthFirstDayOfWeek(jy: number, jm: number): number {
+  const [gy, gm, gd] = jalaliToGregorian(jy, jm, 1);
+  const date = new Date(gy, gm - 1, gd);
+  const jsDay = date.getDay(); // 0 is Sun, 1 is Mon... 6 is Sat
+  return (jsDay + 1) % 7; // 0: Sat (شنبه), 1: Sun (یکشنبه), ... 6: Fri (جمعه)
 }
 
 export function getTodayShamsi(): string {

@@ -60,13 +60,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const totalOvertimeMinutes = relevantAttendance.reduce((sum, a) => sum + (a.overtimeMinutes || 0), 0);
   const totalAbsents = relevantAttendance.filter((a) => a.status === 'ABSENT').length;
 
-  // Department comparative data for chart
+  // Department comparative data for chart (واحدهای کارگاه تولید تخته‌نرد)
   const deptSummaryData = [
-    { name: 'فناوری و مهندسی', حضور: 96, تاخیر: 4, اضافه_کاری: 38 },
-    { name: 'منابع انسانی', حضور: 100, تاخیر: 0, اضافه_کاری: 12 },
-    { name: 'طراحی محصول', حضور: 92, تاخیر: 8, اضافه_کاری: 15 },
-    { name: 'مالی و حسابداری', حضور: 98, تاخیر: 2, اضافه_کاری: 24 },
-    { name: 'پشتیبانی و فروش', حضور: 90, تاخیر: 10, اضافه_کاری: 30 },
+    { name: 'نجاری و کلاف‌سازی', حضور: 98, تاخیر: 2, اضافه_کاری: 45 },
+    { name: 'معرق و منبت', حضور: 96, تاخیر: 4, اضافه_کاری: 38 },
+    { name: 'رنگ‌کاری و پرداخت', حضور: 94, تاخیر: 6, اضافه_کاری: 28 },
+    { name: 'مونتاژ و یراق‌آلات', حضور: 99, تاخیر: 1, اضافه_کاری: 32 },
+    { name: 'کنترل کیفیت و بسته‌بندی', حضور: 100, تاخیر: 0, اضافه_کاری: 20 },
   ];
 
   // CSV Export feature
@@ -232,7 +232,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             مقایسه شاخص‌های حضور، تأخیر و اضافه‌کاری در واحدهای شرکت
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            نرخ درصد حضور منظم و ساعات اضافه‌کاری به تفکیک دپارتمان‌ها
+            نرخ درصد حضور منظم و ساعات اضافه‌کاری به تفکیک بخش‌های کارگاه تخته‌نرد
           </p>
         </div>
 

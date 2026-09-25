@@ -15,6 +15,7 @@ import {
 import { LeaveRequest, Employee, User as AppUser } from '../../types';
 import { StorageService } from '../../services/storage';
 import { getTodayShamsi, formatShamsiDate } from '../../utils/dateUtils';
+import { ShamsiDatePicker } from '../common/ShamsiDatePicker';
 
 interface LeavesViewProps {
   leaves: LeaveRequest[];
@@ -183,20 +184,35 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
               هیچ درخواست مرخصی با این مشخصات ثبت نشده است.
             </div>
           ) : (
-            filteredLeaves.map((req) => (
+            filteredLeaves.map((req) => {
+              const emp = employees.find((e) => e.id === req.employeeId);
+              return (
               <div key={req.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-bold text-slate-900 text-sm">
-                      {req.employeeName}
-                    </div>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      {getLeaveTypeBadge(req.type)}
-                      <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                        {req.type === 'HOURLY'
-                          ? `${req.durationHours || 2} ساعت`
-                          : `${req.durationDays || 1} روز`}
-                      </span>
+                  <div className="flex items-center gap-3">
+                    {emp?.avatarUrl ? (
+                      <img
+                        src={emp.avatarUrl}
+                        alt={req.employeeName}
+                        className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                        {req.employeeName.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-bold text-slate-900 text-sm">
+                        {req.employeeName}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        {getLeaveTypeBadge(req.type)}
+                        <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          {req.type === 'HOURLY'
+                            ? `${req.durationHours || 2} ساعت`
+                            : `${req.durationDays || 1} روز`}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div>{getStatusBadge(req.status)}</div>
@@ -247,7 +263,8 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
                   </div>
                 )}
               </div>
-            ))
+            );
+            })
           )}
         </div>
 
@@ -274,10 +291,32 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredLeaves.map((req) => (
+                filteredLeaves.map((req) => {
+                  const emp = employees.find((e) => e.id === req.employeeId);
+                  return (
                   <tr key={req.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 font-bold text-slate-900">
-                      {req.employeeName}
+                      <div className="flex items-center gap-2.5">
+                        {emp?.avatarUrl ? (
+                          <img
+                            src={emp.avatarUrl}
+                            alt={req.employeeName}
+                            className="w-8 h-8 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                            {req.employeeName.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-slate-900 font-bold text-xs">{req.employeeName}</div>
+                          {emp?.position && (
+                            <span className="text-[11px] text-slate-400 block font-normal">
+                              {emp.position}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
                     <td className="py-3 px-4">{getLeaveTypeBadge(req.type)}</td>
@@ -342,7 +381,8 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
                       </td>
                     )}
                   </tr>
-                ))
+                );
+                })
               )}
             </tbody>
           </table>
@@ -432,12 +472,11 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
               {formData.type === 'HOURLY' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">تاریخ</label>
-                    <input
-                      type="text"
+                    <ShamsiDatePicker
+                      label="تاریخ مرخصی ساعتی"
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value, endDate: e.target.value })}
-                      className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                      onChange={(val) => setFormData({ ...formData, startDate: val, endDate: val })}
+                      required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -464,21 +503,19 @@ export const LeavesView: React.FC<LeavesViewProps> = ({
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">تاریخ شروع</label>
-                    <input
-                      type="text"
+                    <ShamsiDatePicker
+                      label="تاریخ شروع"
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                      onChange={(val) => setFormData({ ...formData, startDate: val })}
+                      required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">تاریخ پایان</label>
-                    <input
-                      type="text"
+                    <ShamsiDatePicker
+                      label="تاریخ پایان"
                       value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                      onChange={(val) => setFormData({ ...formData, endDate: val })}
+                      required
                     />
                   </div>
                 </div>

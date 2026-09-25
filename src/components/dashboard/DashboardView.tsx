@@ -116,12 +116,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { month: 'مهر جاری', hours: 38 },
   ];
 
-  // Payroll distribution by department
+  // Payroll distribution by workshop units (کارگاه تولید تخته‌نرد)
   const departmentCosts = [
-    { name: 'فناوری و مهندسی', value: 108000000, color: '#4f46e5' },
-    { name: 'منابع انسانی و مالی', value: 61000000, color: '#06b6d4' },
-    { name: 'طراحی محصول', value: 28000000, color: '#10b981' },
-    { name: 'پشتیبانی و فروش', value: 50500000, color: '#f59e0b' },
+    { name: 'کارگاه ۱: نجاری و کلاف‌سازی', value: 38000000, color: '#4f46e5' },
+    { name: 'کارگاه ۱: معرق و منبت‌کاری', value: 62000000, color: '#06b6d4' },
+    { name: 'کارگاه ۲: سنباده، رنگ و پلی‌استر', value: 28000000, color: '#f59e0b' },
+    { name: 'کارگاه ۲: مونتاژ و یراق‌آلات', value: 26000000, color: '#10b981' },
+    { name: 'انبار چوب، بسته‌بندی و سرپرستی', value: 53000000, color: '#8b5cf6' },
   ];
 
   return (
@@ -176,7 +177,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {formatNumberFa(totalEmployees)}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-            <span>در تمام دپارتمان‌ها</span>
+            <span>در کارگاه‌های شماره ۱ و ۲ تخته‌نرد</span>
           </div>
         </div>
 
@@ -403,10 +404,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-slate-800 text-sm">
-                توزیع هزینه حقوق در واحدها
+                توزیع هزینه دستمزد در خطوط تولید و کارگاه‌ها
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                سهم هزینه‌ای دپارتمان‌های فعال
+                سهم هزینه‌ای بخش‌های نجاری، معرق، رنگ و مونتاژ تخته‌نرد
               </p>
             </div>
           </div>

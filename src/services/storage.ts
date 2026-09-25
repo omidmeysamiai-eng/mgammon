@@ -28,18 +28,18 @@ import {
 import { getCurrentTimeStr, getTodayShamsi, calculateGpsDistanceMeters } from '../utils/dateUtils';
 
 const STORAGE_KEYS = {
-  SETTINGS: 'mgommon_company_settings_v2',
-  SHIFTS: 'mgommon_shifts_v2',
-  EMPLOYEES: 'mgommon_employees_v2',
-  ATTENDANCE: 'mgommon_attendance_v2',
-  LEAVES: 'mgommon_leaves_v2',
-  ADVANCES: 'mgommon_advances_v2',
-  SALARIES: 'mgommon_salaries_v2',
-  AUDIT_LOGS: 'mgommon_audit_logs_v2',
-  USERS: 'mgommon_users_v2',
-  BONUSES: 'mgommon_bonuses_v2',
-  MESSAGES: 'mgommon_messages_v2',
-  CURRENT_USER: 'mgommon_current_user_v2',
+  SETTINGS: 'mgommon_company_settings_v3',
+  SHIFTS: 'mgommon_shifts_v3',
+  EMPLOYEES: 'mgommon_employees_v3',
+  ATTENDANCE: 'mgommon_attendance_v3',
+  LEAVES: 'mgommon_leaves_v3',
+  ADVANCES: 'mgommon_advances_v3',
+  SALARIES: 'mgommon_salaries_v3',
+  AUDIT_LOGS: 'mgommon_audit_logs_v3',
+  USERS: 'mgommon_users_v3',
+  BONUSES: 'mgommon_bonuses_v3',
+  MESSAGES: 'mgommon_messages_v3',
+  CURRENT_USER: 'mgommon_current_user_v3',
 };
 
 function getItem<T>(key: string, fallback: T): T {
@@ -92,6 +92,16 @@ export class StorageService {
 
   static saveUsers(users: User[]): void {
     setItem(STORAGE_KEYS.USERS, users);
+  }
+
+  static updateUser(updatedUser: User): void {
+    const list = this.getUsers().map(u => u.id === updatedUser.id ? updatedUser : u);
+    this.saveUsers(list);
+    const currentUser = getItem<User | null>(STORAGE_KEYS.CURRENT_USER, null);
+    if (currentUser && currentUser.id === updatedUser.id) {
+      setItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
+    }
+    this.addAuditLog('ویرایش پروفایل کاربر', 'حساب کاربری', `اطلاعات یا تصویر پروفایل ${updatedUser.name} بروزرسانی شد.`);
   }
 
   // Company Settings

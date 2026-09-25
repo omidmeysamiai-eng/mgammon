@@ -21,6 +21,7 @@ import {
   getCurrentTimeStr
 } from '../../utils/dateUtils';
 import { StorageService } from '../../services/storage';
+import { ShamsiDatePicker } from '../common/ShamsiDatePicker';
 
 interface AttendanceViewProps {
   attendance: AttendanceRecord[];
@@ -191,25 +192,33 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <Calendar className="w-4 h-4 text-slate-400" />
-            <span className="font-medium">تاریخ مشاهده:</span>
-            <input
-              type="text"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              placeholder="مثال: ۱۴۰۳/۰۷/۰۲"
-              className="text-xs p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 w-32 font-mono text-center"
-            />
+        <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <span className="font-semibold text-slate-700">تاریخ مشاهده تردد:</span>
+            <div className="w-52">
+              <ShamsiDatePicker
+                value={selectedDate}
+                onChange={(val) => setSelectedDate(val)}
+                placeholder="انتخاب تاریخ..."
+              />
+            </div>
           </div>
 
           <button
             onClick={() => setSelectedDate(getTodayShamsi())}
-            className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-1 rounded bg-indigo-50"
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 cursor-pointer"
           >
-            امروز
+            مشاهده امروز
           </button>
+
+          {selectedDate && (
+            <button
+              onClick={() => setSelectedDate('')}
+              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded cursor-pointer"
+            >
+              نمایش همه تاریخ‌ها
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -217,10 +226,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs rounded-lg border border-slate-200 py-1.5 px-3 bg-white text-slate-700 focus:outline-none"
+            className="text-xs rounded-lg border border-slate-200 py-2 px-3 bg-white text-slate-700 focus:outline-none"
           >
             <option value="ALL">همه وضعیت‌ها</option>
-            <option value="PRESENT">حاضر</option>
+            <option value="PRESENT">حاضر به موقع</option>
             <option value="LATE">تأخیر</option>
             <option value="ABSENT">غیبت</option>
             <option value="ON_LEAVE">در مرخصی</option>
@@ -242,12 +251,25 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               return (
                 <div key={rec.id} className="p-4 space-y-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                        {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {emp?.position} <span className="font-mono text-slate-500">({emp?.personalCode})</span>
+                    <div className="flex items-center gap-3">
+                      {emp?.avatarUrl ? (
+                        <img
+                          src={emp.avatarUrl}
+                          alt={emp ? `${emp.firstName} ${emp.lastName}` : ''}
+                          className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          {emp ? emp.firstName.charAt(0) : '؟'}
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-bold text-slate-900 text-xs sm:text-sm">
+                          {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {emp?.position} <span className="font-mono text-slate-500">({emp?.personalCode})</span>
+                        </div>
                       </div>
                     </div>
                     <div>{getStatusBadge(rec.status, rec.lateMinutes)}</div>
@@ -335,11 +357,28 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   const emp = employees.find((e) => e.id === rec.employeeId);
                   return (
                     <tr key={rec.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-4 font-bold text-slate-900">
-                        {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
-                        <span className="block text-[11px] font-normal text-slate-400">
-                          {emp?.position}
-                        </span>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          {emp?.avatarUrl ? (
+                            <img
+                              src={emp.avatarUrl}
+                              alt={emp ? `${emp.firstName} ${emp.lastName}` : ''}
+                              className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                              {emp ? emp.firstName.charAt(0) : '؟'}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs">
+                              {emp ? `${emp.firstName} ${emp.lastName}` : rec.employeeId}
+                            </div>
+                            <span className="block text-[11px] font-normal text-slate-400">
+                              {emp?.position}
+                            </span>
+                          </div>
+                        </div>
                       </td>
 
                       <td className="py-3 px-4 font-mono text-slate-600">
@@ -448,15 +487,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  تاریخ تردد (شمسی)
-                </label>
-                <input
-                  type="text"
-                  required
+                <ShamsiDatePicker
+                  label="تاریخ تردد (شمسی)"
                   value={manualForm.date}
-                  onChange={(e) => setManualForm({ ...manualForm, date: e.target.value })}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                  onChange={(val) => setManualForm({ ...manualForm, date: val })}
+                  required
                 />
               </div>
 
